@@ -1,0 +1,40 @@
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  web:
+    build:
+      context: ./webapp
+    env_file: webapp/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - outputs:/app/storage/outputs
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./worker
+    env_file: worker/.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - outputs:/app/storage/outputs
+      - whisper-cache:/root/.cache/huggingface
+    depends_on:
+      - redis
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+
+volumes:
+  redis-data:
+  outputs:
+  whisper-cache:

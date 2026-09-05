@@ -8,11 +8,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 STORAGE_DIR = Path(os.environ.get("STORAGE_DIR", BASE_DIR / "storage"))
-UPLOADS_DIR = Path(os.environ.get("UPLOADS_DIR", STORAGE_DIR / "uploads"))
 OUTPUTS_DIR = Path(os.environ.get("OUTPUTS_DIR", STORAGE_DIR / "outputs"))
 WORK_DIR = Path(os.environ.get("WORK_DIR", STORAGE_DIR / "work"))
 
-for _dir in (UPLOADS_DIR, OUTPUTS_DIR, WORK_DIR):
+for _dir in (OUTPUTS_DIR, WORK_DIR):
     _dir.mkdir(parents=True, exist_ok=True)
 
 SOURCE_LANG = os.environ.get("SOURCE_LANG", "en")

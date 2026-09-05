@@ -1,0 +1,9 @@
+# Dependencias do site -- FastAPI + fila. Nao inclui nada de processamento
+# de video (isso e worker/requirements.txt): o site nunca roda
+# ffmpeg/whisper/traducao/dublagem, so enfileira jobs e le status no Redis.
+python-dotenv
+fastapi
+uvicorn[standard]
+redis
+yt-dlp
+pydantic

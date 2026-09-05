@@ -8,7 +8,7 @@ from typing import Callable
 
 from engine import config
 from engine.models import PipelineResult
-from engine.steps import audio, subtitle, transcribe, translate
+from engine.steps import audio, download, subtitle, transcribe, translate
 
 logger = logging.getLogger(__name__)
 
@@ -32,16 +32,31 @@ class PipelineError(RuntimeError):
 
 
 def run(
-    video_path: Path,
+    video_path: Path | None = None,
     on_progress: ProgressCallback = _noop,
     make_subs: bool = True,
     make_dub: bool = True,
     work_dir: Path | None = None,
+    source_url: str | None = None,
+    url_clip_start: float = 0.0,
+    url_clip_duration: float | None = None,
 ) -> PipelineResult:
+    if video_path is None and source_url is None:
+        raise ValueError("Informe video_path ou source_url.")
+
     work_dir = work_dir or config.WORK_DIR
     result = PipelineResult()
 
     try:
+        if source_url is not None:
+            on_progress("download", "Baixando video", 2, "Baixando video da URL informada...")
+            video_path = download.download_video(
+                source_url,
+                work_dir / "source",
+                start=url_clip_start,
+                duration=url_clip_duration,
+            )
+
         on_progress("audio", "Extraindo audio", 5, "Extraindo audio do video...")
         audio_path = audio.extract_audio(video_path, work_dir)
 

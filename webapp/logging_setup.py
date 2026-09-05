@@ -1,4 +1,8 @@
-"""Configuracao de logging compartilhada entre cli.py e api/main.py."""
+"""Configuracao de logging do site.
+
+Copia propria (identica a worker/logging_setup.py) -- e um utilitario
+generico sem nenhum "contrato" entre os servicos, duplicar custa nada.
+"""
 import logging
 from pathlib import Path
 

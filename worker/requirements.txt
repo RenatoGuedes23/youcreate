@@ -1,0 +1,10 @@
+# Dependencias do worker (inclui o motor, engine/) -- roda o processamento
+# de verdade (download, transcricao, traducao, dublagem, render). Nao inclui
+# FastAPI: o worker nao serve HTTP, so consome jobs da fila no Redis.
+python-dotenv
+redis
+faster-whisper
+google-genai
+boto3
+yt-dlp
+pydantic

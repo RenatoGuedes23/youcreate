@@ -1,0 +1,1011 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>youcreate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: oklch(14% 0.012 260);
+    --panel: oklch(19% 0.014 260);
+    --panel-2: oklch(24% 0.016 260);
+    --border: oklch(31% 0.02 260);
+    --text: oklch(96% 0.004 260);
+    --muted: oklch(68% 0.02 260);
+    --accent: oklch(72% 0.16 42);
+    --accent-strong: oklch(64% 0.18 42);
+    --accent-soft: oklch(72% 0.16 42 / 0.14);
+    --on-accent: oklch(18% 0.03 42);
+    --success: oklch(76% 0.15 155);
+    --success-soft: oklch(76% 0.15 155 / 0.14);
+    --error: oklch(68% 0.18 25);
+    --error-soft: oklch(68% 0.18 25 / 0.14);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px 64px;
+  }
+  main {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  a { color: var(--accent); }
+  a:hover { color: var(--accent-strong); }
+  [hidden] { display: none !important; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .header-text { display: flex; flex-direction: column; gap: 4px; }
+  .header-text .name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .header-text .tagline { font-size: 12px; color: var(--muted); }
+
+  /* Intro copy (hidden once a URL is carregada) */
+  #intro-block { display: flex; flex-direction: column; gap: 8px; }
+  #intro-block h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 22px;
+    line-height: 1.3;
+    margin: 0;
+  }
+  #intro-block p {
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  /* URL card */
+  .url-card { display: flex; flex-direction: column; gap: 10px; }
+  .url-card-title { font-size: 14px; font-weight: 600; }
+  .url-card-hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .url-input-row { display: flex; gap: 8px; }
+  .url-input-row input {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 12px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13.5px;
+  }
+  .url-input-row input:focus { outline: none; border-color: var(--accent); }
+  .url-input-row input:disabled { opacity: 0.6; }
+  .btn-inline { width: auto; padding: 11px 16px; white-space: nowrap; }
+  .url-error { font-size: 12.5px; color: var(--error); line-height: 1.5; }
+
+  /* Feature chips */
+  .chips-row { display: flex; gap: 10px; }
+  .chip {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 10px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .chip .label { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+
+  /* Selected source bar */
+  .source-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1.5px solid var(--accent);
+    padding: 14px 16px;
+  }
+  .source-row .icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .source-row .source-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .source-row .source-title {
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .source-row .source-meta { font-size: 11.5px; color: var(--muted); }
+  .btn-ghost-sm {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .btn-ghost-sm:hover { color: var(--text); border-color: var(--muted); }
+
+  /* Trim card */
+  .trim-card { display: flex; flex-direction: column; gap: 16px; }
+  .trim-hint { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  .trim-track {
+    position: relative;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--panel-2);
+    touch-action: none;
+  }
+  .trim-window {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    min-width: 28px;
+    background: var(--accent);
+    border-radius: 8px;
+    cursor: grab;
+  }
+  .trim-window:active { cursor: grabbing; }
+  .trim-grip {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: ew-resize;
+  }
+  .trim-grip.left { left: 0; }
+  .trim-grip.right { right: 0; }
+  .trim-grip .bar {
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+    background: oklch(18% 0.03 42 / 0.5);
+  }
+  .trim-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--muted);
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .trim-times .range { color: var(--text); font-weight: 600; }
+
+  /* Buttons */
+  .btn-primary {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-primary:disabled {
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    cursor: not-allowed;
+  }
+  .btn-outline {
+    width: 100%;
+    padding: 13px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-outline:hover { color: var(--text); border-color: var(--muted); }
+
+  /* Progress hero */
+  .progress-hero { display: flex; flex-direction: column; gap: 18px; }
+  .progress-hero .top-row { display: flex; align-items: flex-end; justify-content: space-between; }
+  .progress-hero .pct {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 38px;
+    line-height: 1;
+  }
+  .progress-hero .message { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+  .progress-hero .meta { font-size: 11px; color: var(--muted); text-align: right; line-height: 1.5; }
+  .waveform { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
+  .waveform .bar { flex: 1; background: var(--panel-2); border-radius: 3px; transition: background 0.2s; }
+  .waveform .bar.lit { background: var(--accent); }
+  .waveform .bar.pulse { animation: pulse 1.4s ease-in-out infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  /* Steps list */
+  .steps-card { padding: 6px 20px; }
+  .step-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 0;
+  }
+  .step-row:not(:last-child) { border-bottom: 1px solid var(--border); }
+  .step-row .ring {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+  }
+  .step-row .check { display: none; flex-shrink: 0; }
+  .step-row .label { font-size: 13.5px; color: var(--muted); }
+  .step-row .pct { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .step-row.is-active .ring { border-color: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+  .step-row.is-active .label { color: var(--text); font-weight: 600; }
+  .step-row.is-active .pct { color: var(--accent); font-weight: 600; }
+  .step-row.is-done .ring { display: none; }
+  .step-row.is-done .check { display: block; }
+  .step-row.is-done .label { color: var(--text); }
+
+  /* Result */
+  .status-card { display: flex; flex-direction: column; gap: 22px; }
+  .status-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .status-badge {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .status-hero .headline { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 21px; }
+  .status-hero .subline { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  .download-list { display: flex; flex-direction: column; gap: 12px; }
+  .download-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .download-row .icon-box {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    background: var(--panel-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .download-row .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .download-row .title { font-size: 13.5px; font-weight: 600; }
+  .download-row .meta { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .btn-download {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 9px;
+    padding: 9px 14px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+  .btn-download.solid { background: var(--accent); color: var(--on-accent); }
+  .btn-download.outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+
+  /* Error message card */
+  .error-msg-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .error-msg-card .tag { display: flex; align-items: center; gap: 8px; }
+  .error-msg-card .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--error); }
+  .error-msg-card .tag-text { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .error-msg-card .body { font-size: 13px; line-height: 1.55; font-family: 'IBM Plex Mono', monospace; }
+</style>
+</head>
+<body>
+<main>
+
+  <div class="header">
+    <div class="logo-mark">
+      <svg width="18" height="16" viewBox="0 0 20 16" fill="none">
+        <rect x="0" y="6" width="2.6" height="4" rx="1.3" fill="var(--accent)"/>
+        <rect x="4.6" y="2" width="2.6" height="12" rx="1.3" fill="var(--accent)"/>
+        <rect x="9.2" y="0" width="2.6" height="16" rx="1.3" fill="var(--accent)"/>
+        <rect x="13.8" y="3" width="2.6" height="10" rx="1.3" fill="var(--accent)"/>
+        <rect x="18.4" y="5.5" width="1.6" height="5" rx="0.8" fill="var(--accent)" opacity="0.5"/>
+      </svg>
+    </div>
+    <div class="header-text">
+      <div class="name">youcreate</div>
+      <div class="tagline">Localização de vídeo &middot; EN &rarr; PT-BR</div>
+    </div>
+  </div>
+
+  <div id="intro-block">
+    <h1>Cole o link de um vídeo do YouTube em inglês.<br>Devolvemos com voz e legenda em PT-BR.</h1>
+    <p>O vídeo é baixado, processado e apagado automaticamente &mdash; sem marca d'água.</p>
+  </div>
+
+  <div class="card url-card" id="url-card">
+    <div class="url-card-title">Link do vídeo</div>
+    <div class="url-card-hint">
+      Cole a URL de um vídeo do YouTube. Ele é baixado no servidor (só o
+      trecho escolhido, quando houver corte) e apagado assim que o
+      processamento terminar.
+    </div>
+    <div class="url-input-row">
+      <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=...">
+      <button type="button" class="btn-primary btn-inline" id="url-load-btn">Carregar</button>
+    </div>
+    <div class="url-error" id="url-error" hidden></div>
+  </div>
+
+  <div class="chips-row" id="feature-chips">
+    <div class="chip">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/>
+        <path d="M19 11a7 7 0 0 1-14 0"/>
+        <path d="M12 18v3"/>
+      </svg>
+      <div class="label">Transcrição<br>local</div>
+    </div>
+    <div class="chip">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M3 12h18M12 3a13 13 0 0 1 0 18 13 13 0 0 1 0-18Z"/>
+      </svg>
+      <div class="label">Tradução<br>PT-BR</div>
+    </div>
+    <div class="chip">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="9" width="2.4" height="6" rx="1.2"/>
+        <rect x="8" y="5.5" width="2.4" height="13" rx="1.2"/>
+        <rect x="13" y="2.5" width="2.4" height="19" rx="1.2"/>
+        <rect x="18" y="7" width="2.4" height="10" rx="1.2"/>
+      </svg>
+      <div class="label">Dublagem<br>natural</div>
+    </div>
+  </div>
+
+  <div class="card source-row" id="source-card" hidden>
+    <div class="icon-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="5" width="20" height="14" rx="2.5"/>
+        <path d="M9.5 9.5v5l4.5-2.5-4.5-2.5Z" fill="var(--accent)" stroke="none"/>
+      </svg>
+    </div>
+    <div class="source-info">
+      <div class="source-title" id="source-title"></div>
+      <div class="source-meta" id="source-meta"></div>
+    </div>
+    <button type="button" class="btn-ghost-sm" id="change-source-btn">Trocar</button>
+  </div>
+
+  <div class="card trim-card" id="trim-section" hidden>
+    <div class="trim-hint">Escolha o trecho a localizar arrastando as bordas &mdash; ou deixe a faixa inteira selecionada para processar o vídeo todo.</div>
+
+    <div>
+      <div class="trim-track" id="trim-track">
+        <div class="trim-window" id="trim-window">
+          <div class="trim-grip left" id="grip-left"><span class="bar"></span></div>
+          <div class="trim-grip right" id="grip-right"><span class="bar"></span></div>
+        </div>
+      </div>
+      <div class="trim-times" style="margin-top:8px;">
+        <span id="trim-start-label">00:00</span>
+        <span class="range" id="trim-range-label">00:00 &ndash; 00:00</span>
+        <span id="trim-total-label">00:00</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-primary" id="submit-btn" disabled>Traduzir e legendar</button>
+
+  <div class="card progress-hero" id="progress-section" hidden>
+    <div class="top-row">
+      <div>
+        <div class="pct" id="progress-pct">0%</div>
+        <div class="message" id="progress-msg"></div>
+      </div>
+      <div class="meta" id="progress-meta">Etapa 0 de 6</div>
+    </div>
+    <div class="waveform" id="waveform"></div>
+  </div>
+
+  <div class="card steps-card" id="steps-card" hidden>
+    <div class="step-row" id="step-audio">
+      <span class="ring"></span>
+      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="label">Extraindo áudio</span>
+      <span class="pct">5%</span>
+    </div>
+    <div class="step-row" id="step-transcribe">
+      <span class="ring"></span>
+      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="label">Transcrevendo</span>
+      <span class="pct">20%</span>
+    </div>
+    <div class="step-row" id="step-translate">
+      <span class="ring"></span>
+      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="label">Traduzindo</span>
+      <span class="pct">45%</span>
+    </div>
+    <div class="step-row" id="step-subtitle">
+      <span class="ring"></span>
+      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="label">Gerando legenda</span>
+      <span class="pct">60%</span>
+    </div>
+    <div class="step-row" id="step-dub">
+      <span class="ring"></span>
+      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="label">Dublando</span>
+      <span class="pct">75%</span>
+    </div>
+    <div class="step-row" id="step-render">
+      <span class="ring"></span>
+      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <span class="label">Renderizando</span>
+      <span class="pct">90%</span>
+    </div>
+  </div>
+
+  <div class="card status-card" id="result-section" hidden>
+    <div class="status-hero">
+      <div class="status-badge" style="background:var(--success-soft); border:1.5px solid var(--success);">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <div>
+        <div class="headline">Tudo pronto!</div>
+        <div class="subline">Seu vídeo foi legendado e dublado para português do Brasil.</div>
+      </div>
+    </div>
+
+    <div class="download-list">
+      <div class="download-row" id="video-download-row" hidden>
+        <div class="icon-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2.5"/>
+            <path d="M9.5 9.5v5l4.5-2.5-4.5-2.5Z" fill="var(--accent)" stroke="none"/>
+          </svg>
+        </div>
+        <div class="info">
+          <div class="title">Vídeo dublado</div>
+          <div class="meta" id="video-file-name"></div>
+        </div>
+        <a id="video-link" class="btn-download solid" href="#">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--on-accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5"/><path d="M4 20h16"/></svg>
+          Baixar
+        </a>
+      </div>
+
+      <div class="download-row" id="srt-download-row" hidden>
+        <div class="icon-box">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2.5"/>
+            <path d="M6 15h4M12 15h6M6 11h12"/>
+          </svg>
+        </div>
+        <div class="info">
+          <div class="title">Legenda</div>
+          <div class="meta" id="srt-file-name"></div>
+        </div>
+        <a id="srt-link" class="btn-download outline" href="#">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5"/><path d="M4 20h16"/></svg>
+          Baixar
+        </a>
+      </div>
+    </div>
+
+    <button type="button" class="btn-outline" id="reset-btn">Processar outro vídeo</button>
+  </div>
+
+  <div class="card status-card" id="error-section" hidden>
+    <div class="status-hero">
+      <div class="status-badge" style="background:var(--error-soft); border:1.5px solid var(--error);">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9v4M12 17h.01"/>
+          <path d="M10.3 3.9 2.5 17.5A1.5 1.5 0 0 0 3.8 20h16.4a1.5 1.5 0 0 0 1.3-2.5L13.7 3.9a1.5 1.5 0 0 0-2.6 0Z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="headline">Não foi possível concluir</div>
+        <div class="subline" id="error-subline">A etapa de processamento falhou.</div>
+      </div>
+    </div>
+
+    <div class="error-msg-card">
+      <div class="tag">
+        <span class="dot"></span>
+        <span class="tag-text" id="error-meta">falhou</span>
+      </div>
+      <div class="body" id="error-msg"></div>
+    </div>
+
+    <div class="download-row" id="error-srt-row" hidden>
+      <div class="icon-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2.5"/>
+          <path d="M6 15h4M12 15h6M6 11h12"/>
+        </svg>
+      </div>
+      <div class="info">
+        <div class="title">Legenda disponível</div>
+        <div class="meta" id="error-srt-name"></div>
+      </div>
+      <a id="error-srt-link" class="btn-download outline" href="#">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5"/><path d="M4 20h16"/></svg>
+        Baixar
+      </a>
+    </div>
+
+    <button type="button" class="btn-primary" id="retry-btn">
+      Tentar novamente
+    </button>
+  </div>
+
+</main>
+
+<script>
+  const MIN_CLIP_SECONDS = 1;
+  const STEPS = [
+    { id: 'audio', label: 'Extraindo áudio', pct: 5 },
+    { id: 'transcribe', label: 'Transcrevendo', pct: 20 },
+    { id: 'translate', label: 'Traduzindo', pct: 45 },
+    { id: 'subtitle', label: 'Gerando legenda', pct: 60 },
+    { id: 'dub', label: 'Dublando', pct: 75 },
+    { id: 'render', label: 'Renderizando', pct: 90 },
+  ];
+
+  const introBlock = document.getElementById('intro-block');
+  const featureChips = document.getElementById('feature-chips');
+  const submitBtn = document.getElementById('submit-btn');
+
+  const urlInput = document.getElementById('url-input');
+  const urlLoadBtn = document.getElementById('url-load-btn');
+  const urlError = document.getElementById('url-error');
+
+  const sourceCard = document.getElementById('source-card');
+  const sourceTitleEl = document.getElementById('source-title');
+  const sourceMetaEl = document.getElementById('source-meta');
+  const changeSourceBtn = document.getElementById('change-source-btn');
+
+  const trimSection = document.getElementById('trim-section');
+  const trimTrack = document.getElementById('trim-track');
+  const trimWindow = document.getElementById('trim-window');
+  const gripLeft = document.getElementById('grip-left');
+  const gripRight = document.getElementById('grip-right');
+  const trimStartLabel = document.getElementById('trim-start-label');
+  const trimRangeLabel = document.getElementById('trim-range-label');
+  const trimTotalLabel = document.getElementById('trim-total-label');
+
+  let sourceUrl = '';
+  let videoDuration = 0;
+  let clipStart = 0;
+  let clipEnd = 0;
+  let needsTrim = false;
+
+  // Job com resultado (video/srt) ainda disponivel para download nesta tela.
+  // Descartado (arquivos apagados no servidor) ao sair dela -- ver
+  // discardActiveResult() e resetSelection()/pagehide abaixo.
+  let activeResultJobId = '';
+
+  function discardActiveResult() {
+    if (!activeResultJobId) return;
+    navigator.sendBeacon(`/api/jobs/${activeResultJobId}/discard`);
+    activeResultJobId = '';
+  }
+
+  window.addEventListener('pagehide', discardActiveResult);
+
+  const progressSection = document.getElementById('progress-section');
+  const progressPct = document.getElementById('progress-pct');
+  const progressMsg = document.getElementById('progress-msg');
+  const progressMeta = document.getElementById('progress-meta');
+  const waveform = document.getElementById('waveform');
+  const stepsCard = document.getElementById('steps-card');
+
+  const resultSection = document.getElementById('result-section');
+  const videoDownloadRow = document.getElementById('video-download-row');
+  const videoLink = document.getElementById('video-link');
+  const videoFileName = document.getElementById('video-file-name');
+  const srtDownloadRow = document.getElementById('srt-download-row');
+  const srtLink = document.getElementById('srt-link');
+  const srtFileName = document.getElementById('srt-file-name');
+  const resetBtn = document.getElementById('reset-btn');
+
+  const errorSection = document.getElementById('error-section');
+  const errorMsg = document.getElementById('error-msg');
+  const errorMeta = document.getElementById('error-meta');
+  const errorSrtRow = document.getElementById('error-srt-row');
+  const errorSrtName = document.getElementById('error-srt-name');
+  const errorSrtLink = document.getElementById('error-srt-link');
+  const retryBtn = document.getElementById('retry-btn');
+
+  const WAVE_HEIGHTS = [38, 70, 50, 90, 60, 75, 45, 80, 55, 65, 40, 30, 58, 35, 48, 28, 52, 33];
+  WAVE_HEIGHTS.forEach(() => {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    waveform.appendChild(bar);
+  });
+
+  let lastStep = { label: '', pct: 0 };
+
+  function formatTime(seconds) {
+    const total = Math.max(0, Math.round(seconds));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const mm = String(m).padStart(2, '0');
+    const ss = String(s).padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+  }
+
+  urlLoadBtn.addEventListener('click', loadFromUrl);
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); loadFromUrl(); }
+  });
+
+  async function loadFromUrl() {
+    const value = urlInput.value.trim();
+    urlError.hidden = true;
+    if (!value) return;
+
+    urlLoadBtn.disabled = true;
+    urlLoadBtn.textContent = 'Carregando…';
+    try {
+      const resp = await fetch(`/api/probe?url=${encodeURIComponent(value)}`);
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || 'Não foi possível ler esse link.');
+      }
+      const data = await resp.json();
+
+      sourceUrl = value;
+      videoDuration = data.duration || 0;
+
+      resetPanels();
+      introBlock.hidden = true;
+      featureChips.hidden = true;
+      sourceCard.hidden = false;
+      sourceTitleEl.textContent = data.title || 'Vídeo';
+      sourceMetaEl.textContent = videoDuration ? formatTime(videoDuration) : '';
+      submitBtn.hidden = false;
+      submitBtn.disabled = false;
+
+      if (videoDuration > 0) {
+        trimSection.hidden = false;
+        setClipRange(0, videoDuration);
+      } else {
+        trimSection.hidden = true;
+        needsTrim = false;
+      }
+    } catch (e) {
+      urlError.hidden = false;
+      urlError.textContent = e.message;
+    } finally {
+      urlLoadBtn.disabled = false;
+      urlLoadBtn.textContent = 'Carregar';
+    }
+  }
+
+  changeSourceBtn.addEventListener('click', resetSelection);
+
+  function resetSelection() {
+    discardActiveResult();
+    urlInput.value = '';
+    sourceUrl = '';
+    videoDuration = 0;
+    clipStart = 0;
+    clipEnd = 0;
+    needsTrim = false;
+    urlError.hidden = true;
+    resetPanels();
+    sourceCard.hidden = true;
+    trimSection.hidden = true;
+    submitBtn.hidden = false;
+    submitBtn.disabled = true;
+    introBlock.hidden = false;
+    featureChips.hidden = false;
+  }
+
+  function setClipRange(start, end) {
+    if (!videoDuration) return;
+    start = Math.max(0, start);
+    end = Math.min(videoDuration, end);
+    if (end - start < MIN_CLIP_SECONDS) {
+      const mid = (start + end) / 2;
+      end = Math.min(videoDuration, mid + MIN_CLIP_SECONDS / 2);
+      start = Math.max(0, end - MIN_CLIP_SECONDS);
+    }
+    clipStart = start;
+    clipEnd = end;
+    needsTrim = !(clipStart <= 0.05 && clipEnd >= videoDuration - 0.05);
+
+    const leftPct = (clipStart / videoDuration) * 100;
+    const widthPct = ((clipEnd - clipStart) / videoDuration) * 100;
+    trimWindow.style.left = leftPct + '%';
+    trimWindow.style.width = widthPct + '%';
+
+    trimStartLabel.textContent = formatTime(clipStart);
+    trimTotalLabel.textContent = formatTime(videoDuration);
+    trimRangeLabel.textContent = `${formatTime(clipStart)} – ${formatTime(clipEnd)} (${formatTime(clipEnd - clipStart)})`;
+  }
+
+  let dragMode = null; // null | 'left' | 'right' | 'move'
+  let dragStartX = 0;
+  let dragStartClipStart = 0;
+  let dragStartClipEnd = 0;
+
+  trimWindow.addEventListener('pointerdown', (e) => {
+    if (gripLeft.contains(e.target)) dragMode = 'left';
+    else if (gripRight.contains(e.target)) dragMode = 'right';
+    else dragMode = 'move';
+    dragStartX = e.clientX;
+    dragStartClipStart = clipStart;
+    dragStartClipEnd = clipEnd;
+    trimWindow.setPointerCapture(e.pointerId);
+  });
+  trimWindow.addEventListener('pointermove', (e) => {
+    if (!dragMode) return;
+    const rect = trimTrack.getBoundingClientRect();
+    const deltaSec = ((e.clientX - dragStartX) / rect.width) * videoDuration;
+    if (dragMode === 'left') {
+      setClipRange(dragStartClipStart + deltaSec, dragStartClipEnd);
+    } else if (dragMode === 'right') {
+      setClipRange(dragStartClipStart, dragStartClipEnd + deltaSec);
+    } else {
+      const dur = dragStartClipEnd - dragStartClipStart;
+      let newStart = dragStartClipStart + deltaSec;
+      newStart = Math.max(0, Math.min(newStart, videoDuration - dur));
+      setClipRange(newStart, newStart + dur);
+    }
+  });
+  trimWindow.addEventListener('pointerup', () => { dragMode = null; });
+  trimWindow.addEventListener('pointercancel', () => { dragMode = null; });
+
+  trimTrack.addEventListener('pointerdown', (e) => {
+    if (trimWindow.contains(e.target)) return;
+    const rect = trimTrack.getBoundingClientRect();
+    const sec = ((e.clientX - rect.left) / rect.width) * videoDuration;
+    const dur = clipEnd - clipStart;
+    let newStart = sec - dur / 2;
+    newStart = Math.max(0, Math.min(newStart, videoDuration - dur));
+    setClipRange(newStart, newStart + dur);
+  });
+
+  submitBtn.addEventListener('click', startJob);
+  retryBtn.addEventListener('click', startJob);
+
+  async function startJob() {
+    if (!sourceUrl) return;
+
+    resetPanels();
+    setControlsEnabled(false);
+    submitBtn.hidden = true;
+
+    const payload = { url: sourceUrl };
+    if (needsTrim) {
+      payload.start = Number(clipStart.toFixed(2));
+      payload.clip_duration = Number((clipEnd - clipStart).toFixed(2));
+    }
+
+    let jobId;
+    try {
+      const resp = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || 'Falha ao iniciar o processamento.');
+      }
+      const data = await resp.json();
+      jobId = data.id;
+    } catch (e) {
+      showError(e.message, lastStep);
+      setControlsEnabled(true);
+      return;
+    }
+
+    progressSection.hidden = false;
+    stepsCard.hidden = false;
+    lastStep = { label: '', pct: 0 };
+    updateStepsList(null);
+    const source = new EventSource(`/api/jobs/${jobId}/events`);
+
+    source.onmessage = async (ev) => {
+      const data = JSON.parse(ev.data);
+
+      if (data.done) {
+        source.close();
+        if (data.status === 'done') {
+          await showResult(jobId);
+        } else {
+          const status = await fetchStatus(jobId);
+          showError(status.message || 'Ocorreu um erro no processamento.', lastStep);
+          if (status.srt) {
+            errorSrtRow.hidden = false;
+            errorSrtName.textContent = status.srt;
+            errorSrtLink.href = `/api/download/${status.srt}`;
+            activeResultJobId = jobId;
+          }
+        }
+        setControlsEnabled(true);
+        return;
+      }
+
+      if (data.step !== 'error') {
+        lastStep = { label: data.label, pct: data.pct };
+        updateProgress(data.pct, data.label, data.message, data.step);
+      }
+    };
+
+    source.onerror = () => {
+      source.close();
+      showError('Conexão perdida com o servidor.', lastStep);
+      setControlsEnabled(true);
+    };
+  }
+
+  function updateProgress(pct, step, message, stepId) {
+    progressPct.textContent = pct + '%';
+    progressMsg.textContent = message || '';
+
+    const idx = STEPS.findIndex((s) => s.id === stepId);
+    progressMeta.textContent = `Etapa ${idx >= 0 ? idx + 1 : 0} de ${STEPS.length}`;
+
+    const lit = Math.round((pct / 100) * WAVE_HEIGHTS.length);
+    Array.from(waveform.children).forEach((bar, i) => {
+      bar.style.height = WAVE_HEIGHTS[i] + '%';
+      bar.classList.toggle('lit', i < lit);
+      bar.classList.toggle('pulse', i === lit - 1 && pct < 100);
+    });
+
+    updateStepsList(stepId);
+  }
+
+  function updateStepsList(currentId) {
+    const idx = STEPS.findIndex((s) => s.id === currentId);
+    STEPS.forEach((s, i) => {
+      const row = document.getElementById('step-' + s.id);
+      row.classList.remove('is-done', 'is-active', 'is-pending');
+      if (currentId === 'done' || (idx >= 0 && i < idx)) {
+        row.classList.add('is-done');
+      } else if (i === idx) {
+        row.classList.add('is-active');
+      } else {
+        row.classList.add('is-pending');
+      }
+    });
+  }
+
+  async function fetchStatus(jobId) {
+    const resp = await fetch(`/api/jobs/${jobId}`);
+    return resp.json();
+  }
+
+  async function showResult(jobId) {
+    const status = await fetchStatus(jobId);
+    updateProgress(100, 'Concluído', 'Processamento concluído.', 'done');
+    progressSection.hidden = true;
+    stepsCard.hidden = true;
+    resultSection.hidden = false;
+
+    if (status.video) {
+      videoDownloadRow.hidden = false;
+      videoLink.href = `/api/download/${status.video}`;
+      videoFileName.textContent = status.video;
+    }
+    if (status.srt) {
+      srtDownloadRow.hidden = false;
+      srtLink.href = `/api/download/${status.srt}`;
+      srtFileName.textContent = status.srt;
+    }
+    if (status.video || status.srt) {
+      activeResultJobId = jobId;
+    }
+  }
+
+  function showError(message, step) {
+    progressSection.hidden = true;
+    stepsCard.hidden = true;
+    errorSection.hidden = false;
+    errorMsg.textContent = message;
+    errorMeta.textContent = step && step.label
+      ? `Falhou na etapa · ${step.label.toLowerCase()} · ${step.pct}%`
+      : 'Falhou no processamento';
+  }
+
+  function resetPanels() {
+    progressSection.hidden = true;
+    stepsCard.hidden = true;
+    resultSection.hidden = true;
+    errorSection.hidden = true;
+    videoDownloadRow.hidden = true;
+    srtDownloadRow.hidden = true;
+    errorSrtRow.hidden = true;
+    updateProgress(0, '', '', null);
+  }
+
+  function setControlsEnabled(enabled) {
+    submitBtn.disabled = !enabled || !sourceUrl;
+    submitBtn.textContent = enabled ? 'Traduzir e legendar' : 'Processando…';
+    urlInput.disabled = !enabled;
+    urlLoadBtn.disabled = !enabled;
+    changeSourceBtn.style.pointerEvents = enabled ? 'auto' : 'none';
+    trimSection.style.pointerEvents = enabled ? 'auto' : 'none';
+    trimSection.style.opacity = enabled ? '1' : '0.6';
+  }
+
+  resetBtn.addEventListener('click', resetSelection);
+</script>
+</body>
+</html>

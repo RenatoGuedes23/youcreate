@@ -2,8 +2,19 @@
 from pydantic import BaseModel
 
 
+class JobCreateRequest(BaseModel):
+    url: str
+    start: float = 0.0
+    clip_duration: float | None = None
+
+
 class JobCreated(BaseModel):
     id: str
+
+
+class ProbeResult(BaseModel):
+    duration: float
+    title: str
 
 
 class JobStatus(BaseModel):

@@ -1,9 +1,0 @@
-python-dotenv
-fastapi
-uvicorn[standard]
-python-multipart
-faster-whisper
-google-genai
-boto3
-yt-dlp
-pydantic
