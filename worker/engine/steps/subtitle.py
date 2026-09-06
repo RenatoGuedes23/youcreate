@@ -28,3 +28,23 @@ def build_srt(segments: list[Segment], out_path: Path, translated: bool = True) 
         lines.append("")
     out_path.write_text("\n".join(lines), encoding="utf-8")
     return out_path
+
+
+def build_vtt(segments: list[Segment], out_path: Path, translated: bool = True) -> Path:
+    """Gera um .vtt (WebVTT) a partir dos mesmos segmentos do .srt -- usado
+    pela faixa <track> do player na tela de resultado, para nao depender so
+    da legenda queimada no video. Mesma timestamp do SRT, so troca a virgula
+    dos milissegundos por ponto (formato exigido pelo WebVTT) e adiciona o
+    cabecalho "WEBVTT".
+    """
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["WEBVTT", ""]
+    for seg in segments:
+        text = seg.translation if translated else seg.text
+        start = _format_timestamp(seg.start).replace(",", ".")
+        end = _format_timestamp(seg.end).replace(",", ".")
+        lines.append(f"{start} --> {end}")
+        lines.append(text)
+        lines.append("")
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+    return out_path

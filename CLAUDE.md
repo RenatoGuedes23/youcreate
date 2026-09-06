@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 All 5 original build phases (see "Build phases" below) are implemented and validated end-to-end with real dubbing (Amazon Polly), including the video-trim feature (§ Frontend) and friendly error handling / logging (§ Quality bar). The original architecture spec (`docs/youclone-arquitetura.md`, in Portuguese) is kept as historical reference; this file is the up-to-date source of truth. See `docs/ARQUITETURA.md` (design/why) and `docs/FLUXO.md` (request trace/how) for the current, detailed documentation. Google Cloud TTS was implemented earlier and then **removed** by explicit operator decision (2026-09) in favor of Polly alone — do not re-add it unless asked.
 
+**Frontend redesigned as 5 client-routed screens (2026-09).** The original single-panel frontend (URL input + inline progress/result/error all inside one form) was replaced by a 5-screen SPA per a detailed operator-supplied visual spec: Tela 1 (`/`, paste link), Tela 2 (`/configurar`, language/subtitle/trim options), Tela 3 (`/v/<id>`, processing), Tela 4 (`/v/<id>` done, result/player/downloads), Tela 5 (`/v/<id>` failed/cancelled, generic error component). This came with real backend support that didn't exist before: job cancellation (`PipelineCancelled`, checked only between pipeline steps), heuristic error classification (`error_code` on the job), WebVTT subtitle generation (`subtitle.build_vtt`, for the Tela 4 `<video><track>`), and HMAC-signed short-lived download URLs. See "Web service", "Worker service", and "Frontend" below for specifics. Two explicit operator decisions worth remembering: file cleanup stays **discard-on-pagehide** (not a fixed 24h expiration — Tela 4 deliberately has no "apagamos em 24h" messaging), and there is still **no accounts/quota/billing system** — cancellation is real, not a quota gate.
+
 **YouTube URL is the only input.** File upload was removed entirely (CLI, web service, and web frontend) in favor of pasting a YouTube URL — the operator never handles the source file at all. Only `youtube.com`/`youtu.be`/`m.youtube.com`/`music.youtube.com` over http/https are accepted. Trimming (start + duration) is optional and uncapped — no fixed 60s window; the frontend's trim bar is a free two-handle range over the full duration, defaulting to the whole video. When a clip duration is given, the download step uses yt-dlp's `download_ranges` to fetch only that segment instead of the whole video.
 
 **Three independent services, deliberately with zero shared source code (2026-09).** The original single FastAPI process (which called the engine in-process via a Python thread) was split into `webapp/` (the site) and `worker/` (the engine), talking to each other **only through Redis** — never through a shared import, a shared volume of code, or a direct function call. This was an explicit operator requirement: each of `webapp/` and `worker/` must be a self-contained folder that could be copied out and deployed on its own, with no reference to anything outside itself. Concretely:
@@ -20,6 +22,12 @@ All 5 original build phases (see "Build phases" below) are implemented and valid
 **Deployment target shifted from laptop to a cloud VM.** Still single-user in the sense that there's one operator and no accounts/auth, but the queue now genuinely supports multiple concurrent jobs processed by multiple worker replicas (`docker compose up -d --scale worker=N`) — this was an explicit ask, not speculative scaling. Job state lives in Redis (hash `youcreate:job:<id>`, list `youcreate:queue`, pub/sub channel `youcreate:job:<id>:events`), with a 24h TTL on job metadata (`JOB_TTL_SECONDS`) so Redis doesn't grow unbounded — final results themselves live on disk (`storage/outputs/`, shared between `webapp` and `worker` containers via a Docker named volume), not in Redis. `worker/worker.py`'s `main()` sweeps any leftover subdirectory of `WORK_DIR` on startup (defensive: a worker container restart normally wipes its own ephemeral disk anyway, but this guards against a persistent-volume misconfiguration).
 
 **A Redis client gotcha worth remembering:** `redis-py`'s blocking commands (`BLPOP` in `worker/queue_client.py::dequeue`) need the connection's `socket_timeout` set comfortably higher than the blocking command's own timeout — otherwise the client raises `redis.exceptions.TimeoutError` on the socket before Redis gets to reply with `nil` at the end of the block. Both `queue_client.py` copies set `socket_timeout=30` on the shared `redis.Redis` client for this reason (dequeue's timeout is 5s; `webapp`'s SSE loop also polls `pubsub.get_message(timeout=5.0, ...)`, same class of risk).
+
+**Corporate TLS-inspecting proxies break `docker build` (2026-09) — fixed, but worth understanding.** On the operator's dev machine (behind a corporate Zscaler proxy that re-signs all outbound HTTPS with its own CA), every `Dockerfile`'s `pip install` failed with `CERTIFICATE_VERIFY_FAILED`, and even after making the container trust Zscaler's CA (`update-ca-certificates`), `yt-dlp` calls from inside the container **still** failed the same way. Root cause layered in two parts, both now handled in `webapp/Dockerfile` and `worker/Dockerfile`:
+1. `pip`/`requests` (and anything using the vendored `certifi` package) don't consult the OS trust store by default — they need `REQUESTS_CA_BUNDLE`/`SSL_CERT_FILE`/`PIP_CERT` explicitly pointed at `/etc/ssl/certs/ca-certificates.crt` (which itself needs the extra CA merged in via `update-ca-certificates` first).
+2. `yt-dlp` goes a step further and reads `certifi.where()`'s bundle file **directly**, ignoring those env vars entirely — there's no `--trust-extra-ca` flag, only the insecure `--no-check-certificates`. The only fix is to `cat` the extra CA(s) onto the end of that installed `cacert.pem` file at build time, after `pip install` has put `certifi` in place.
+
+Both Dockerfiles do this via an **optional, gitignored `certs/` folder** per service (`webapp/certs/`, `worker/certs/`, each with a `.gitkeep` so the folder always exists for `COPY` to succeed even when empty): if a machine needs to trust an extra CA to build, drop `.crt` file(s) there; on a machine with normal internet access (the actual deploy VM), the folder is empty and the extra steps are no-ops. **Do not bake a specific company's CA into the repo** — this is a per-machine, gitignored workaround, not a project dependency.
 
 ## Project goal
 
@@ -212,34 +220,46 @@ The orchestrator knows nothing about HTTP, Redis, or jobs — only the callback.
 
 Endpoints (`main.py`):
 - `GET /api/probe?url=`: reads `{ duration, title }` for a YouTube URL via `youtube_probe.probe` (standalone, not a call into `worker/engine/`), without downloading it — used by the frontend to size the trim bar before submitting.
-- `POST /api/jobs` (JSON body, `JobCreateRequest`: `{url, start?, clip_duration?}`): calls `queue_client.create_job` — writes the job hash to Redis and pushes its id onto `youcreate:queue`. Returns immediately with `{ "id": <job_id> }`; the download and processing happen entirely inside whichever `worker` picks it up.
-- `GET /api/jobs/{id}`: reads current state `{ status, pct, step, message, video, srt }` from the Redis hash via `queue_client.get_job`.
-- `GET /api/jobs/{id}/events`: **SSE** stream. Subscribes to the job's Redis pub/sub channel (`queue_client.subscribe`), checks current status first (handles the job having already finished before the subscribe call), then loops on `pubsub.get_message(timeout=5.0, ...)`, re-checking status on every timeout as a safety net against a missed final message. Emits `data: {step,pct,message}\n\n` per event, plus a final `data: {done:true,status}\n\n`.
-- `GET /api/download/{filename}`: serves files from `OUTPUTS_DIR` (the shared Docker volume).
-- `GET /`: serves `web/index.html`.
+- `POST /api/jobs` (JSON body, `JobCreateRequest`: `{url, start?, clip_duration?, source_lang, target_lang, include_subtitles, video_title?, video_duration?}`): calls `queue_client.create_job` — writes the job hash to Redis and pushes its id onto `youcreate:queue`. Returns immediately with `{ "id": <job_id> }`; the download and processing happen entirely inside whichever `worker` picks it up. `video_title`/`video_duration` are supplied by the frontend from its earlier `GET /api/probe` call purely so the processing/result screens (Telas 3/4) can render immediately from `GET /api/jobs/{id}` without re-probing.
+- `GET /api/jobs/{id}` (`JobStatus`): reads current state from the Redis hash via `queue_client.get_job` — `status` (`queued|running|done|error|cancelled`), `pct`, `step`, `message`, `error_code`, `created_at`, `source_url`, `source_lang`, `target_lang`, `video_title`, `video_duration`, `include_subtitles`, plus `video_name`/`srt_name` (bare filenames) and `video_url`/`srt_url`/`vtt_url` (signed, time-limited download links — see below). This single endpoint is what lets the frontend fully reconstruct any of Telas 3/4/5 from a cold page load at `/v/{id}` (refresh, or a link opened later), since every field the UI needs is in this one response.
+- `GET /api/jobs/{id}/events`: **SSE** stream. Subscribes to the job's Redis pub/sub channel (`queue_client.subscribe`), checks current status first (handles the job having already finished before the subscribe call), then loops on `pubsub.get_message(timeout=5.0, ...)`, re-checking status on every timeout as a safety net against a missed final message. Emits `data: {step,pct,message}\n\n` per event, plus a final `data: {done:true,status}\n\n` (`status` includes `cancelled`).
+- `POST /api/jobs/{id}/cancel`: sets `cancel_requested=1` on the job's Redis hash (`queue_client.request_cancel`). The worker only checks this **between** pipeline steps (`PipelineCancelled` in `engine/pipeline.py`), never mid-subprocess — a deliberately simple cancellation model, not a hard kill.
+- `GET /api/download/{filename}?exp=&sig=`: serves files from `OUTPUTS_DIR` (the shared Docker volume), but only with a valid HMAC-SHA256 signature and an unexpired `exp` timestamp (`DOWNLOAD_URL_TTL_SECONDS`, 1h) — see "Signed download links" below. Bare `/api/download/{filename}` with no query params is rejected (422).
+- `GET /`, `GET /configurar`, `GET /v/{job_id}`: all three serve the same `web/index.html` — routing between Telas 1–5 is entirely client-side (`history.pushState`/`popstate`); serving the same file on all three routes means a hard refresh on any of them (including a `/v/{id}` link shared or reopened later) doesn't 404.
+
+**Signed download links.** Since there are no accounts/sessions, `webapp/main.py` signs `{filename}:{exp}` with HMAC-SHA256 using `DOWNLOAD_SIGN_SECRET` (from `.env`, or a random one generated per-process if unset — acceptable because a restart only invalidates old links, and there's nothing more sensitive being protected than "don't let a stale/guessed filename download indefinitely"). `JobStatus.video_url`/`srt_url`/`vtt_url` already carry the `?exp=&sig=` query string — the frontend never constructs a download URL itself, only uses what `GET /api/jobs/{id}` returns.
+
+**Error classification.** `worker/worker.py::_classify_error` does best-effort string matching on the exception message (mostly yt-dlp's own text) to produce a short `error_code` (`video_privado`, `video_indisponivel`, `restrito_regiao`, `sem_audio`, or the fallback `falha_interna`; `video_longo` exists in the frontend's error-content map but is never emitted by the backend — there's no video-length cap in the engine, see "Locked decisions"). This is inherently a moving target — yt-dlp doesn't expose a structured error type — and is expected to be extended as new real failure messages show up in `storage/youcreate-worker.log`. The Tela 5 error screen (`webapp/web/index.html`) is a **generic, code-driven component**: unknown/unmapped codes render the `falha_interna` copy, so adding a backend classification case is optional, not required, for an error to display reasonably.
 
 `queue_client.py` (producer half — see "Current state" for why this isn't imported from `worker/`):
 ```python
 @dataclass
 class JobRecord:
     id: str; source_url: str
+    created_at: float = 0.0
     url_clip_start: float = 0.0; url_clip_duration: float | None = None
-    status: str = "queued"   # queued|running|done|error
+    source_lang: str = ""; target_lang: str = ""
+    include_subtitles: bool = True
+    video_title: str = ""; video_duration: float = 0.0
+    status: str = "queued"   # queued|running|done|error|cancelled
     pct: int = 0; step: str = ""; message: str = ""
-    result_video: str = ""; result_srt: str = ""
+    error_code: str = ""; cancel_requested: bool = False
+    result_video: str = ""; result_srt: str = ""; result_vtt: str = ""
 
-def create_job(source_url, url_clip_start=0.0, url_clip_duration=None) -> str  # job id
+def create_job(source_url, url_clip_start=0.0, url_clip_duration=None, source_lang="", target_lang="", include_subtitles=True, video_title="", video_duration=0.0) -> str  # job id
 def get_job(job_id) -> JobRecord | None
+def request_cancel(job_id) -> bool
 def subscribe(job_id) -> redis.client.PubSub
 ```
 
 ## Worker service (`worker/`)
 
-`worker.py`'s `main()` loop: `queue_client.dequeue(timeout=5)` (BLPOP — atomic across replicas, each job consumed by exactly one worker) → `_process(job_id)`, which reads the job from Redis, calls `pipeline.run(...)` with an `on_progress` that does `queue_client.update_job(...)` + `queue_client.publish_event(...)`, and in a `finally` block `shutil.rmtree`s the job's `work_dir` regardless of success/failure — the downloaded video and every intermediate artifact are temporary; only `OUTPUTS_DIR` (shared volume) needs to survive.
+`worker.py`'s `main()` loop: `queue_client.dequeue(timeout=5)` (BLPOP — atomic across replicas, each job consumed by exactly one worker) → `_process(job_id)`, which reads the job from Redis, calls `pipeline.run(..., should_cancel=lambda: queue_client.is_cancelled(job_id))` with an `on_progress` that does `queue_client.update_job(...)` + `queue_client.publish_event(...)`, and in a `finally` block `shutil.rmtree`s the job's `work_dir` regardless of success/failure — the downloaded video and every intermediate artifact are temporary; only `OUTPUTS_DIR` (shared volume) needs to survive. `PipelineCancelled` is caught separately from `PipelineError` and sets `status="cancelled"` (distinct from `"error"` — the frontend's Tela 5 shows different copy for each). Any other `PipelineError`/`Exception` is run through `_classify_error(message)` (see "Web service" above) to set `error_code` before publishing the failure.
 
 `queue_client.py` (consumer half):
 ```python
 def get_job(job_id) -> JobRecord | None
+def is_cancelled(job_id) -> bool   # reads cancel_requested fresh from Redis, no caching
 def update_job(job_id, **fields) -> None
 def publish_event(job_id, event: dict) -> None
 def dequeue(timeout=5) -> str | None   # BLPOP
@@ -249,9 +269,19 @@ Run multiple replicas for concurrent processing: `docker compose up -d --scale w
 
 ## Frontend (`webapp/web/index.html`)
 
-Single page, dark theme, mobile-friendly: a single YouTube URL input + "Carregar" button, "Traduzir e legendar" submit, progress bar fed by `EventSource` against the SSE endpoint, and download links for the `.mp4` and `.srt` on completion. No file picker, no upload mode — URL is the only input. No framework — must be trivial to later replace with React without backend changes.
+Single-page dark-theme SPA, five client-side-routed screens sharing one `:root` token system (see the file's `<style>` block for exact colors/spacing) and one `<script>`, no framework — must stay trivial to replace with React without touching the backend:
 
-**Trim bar — optional, uncapped.** After "Carregar" resolves via `GET /api/probe`, the trim bar always appears (any duration) with the full range pre-selected — leaving it untouched means the whole video is processed. It's a two-handle range (`#trim-window` with `.trim-grip.left`/`.trim-grip.right`), each independently draggable to narrow the clip, plus a body-drag to move the whole window; `setClipRange(start, end)` enforces `MIN_CLIP_SECONDS = 1` and recomputes `needsTrim` (`true` only when the range is narrower than the full video). On submit, `start`/`clip_duration` are included in the `POST /api/jobs` JSON body only when `needsTrim` is true. There's no local video preview (the source is a remote URL, not a local file) — just the track + time labels.
+1. **Tela 1** (`/`, `#screen-home`) — paste a YouTube URL, "Processar" calls `GET /api/probe`.
+2. **Tela 2** (`/configurar`, `#screen-configure`) — source/target language selects (native `<select>`, populated from `GET /api/languages`; only `pt` is `enabled_as_target`, others show "(em breve)"), subtitle on/off, the trim bar (see below), "Gerar vídeo" → `POST /api/jobs` → navigates to `/v/{id}`.
+3. **Tela 3** (`/v/{id}` while queued/running, `#screen-processing`) — giant percentage + current-stage label driven directly by the `pct`/`step` the backend already emits (no client-side interpolation — a deliberate simplicity choice: the engine's own step weights, e.g. `transcribe→20`, `dub→75`, already read fine as "progress"), a video info card, and a bottom band with "pode fechar a aba" copy, a rough ETA, and an inline (non-`window.confirm`) Cancelar → `POST /api/jobs/{id}/cancel`.
+4. **Tela 4** (`/v/{id}` when `status=done`, `#screen-result`) — native `<video controls>` with a `<track kind="subtitles">` pointed at the signed `vtt_url` (only when `include_subtitles`), download cards for the MP4 (always) and SRT (hidden entirely, MP4 card goes full-width, when subtitles were off), file sizes fetched via a `HEAD` request against the signed URL, and "Traduzir para outro idioma" (re-runs Tela 2's probe flow against the same `source_url`).
+5. **Tela 5** (`/v/{id}` when `status=error|cancelled`, or the job id isn't found, `#screen-error`) — generic code→content component (`ERROR_CONTENT` map in the script), `role="alert"`, focuses the title on entry; never shows a raw stack trace, only the short `error_code`-driven copy plus (for `falha_interna`) the first 8 chars of the job id, for support purposes.
+
+Loading `/v/{id}` directly (fresh tab, refresh, a link opened later) fully reconstructs whichever of Telas 3/4/5 applies from a single `GET /api/jobs/{id}` call — there is no reliance on in-memory state surviving a reload, since the backend now returns everything the UI needs (title, duration, languages, subtitle choice, error code, signed URLs).
+
+**File cleanup stays discard-on-pagehide, not a fixed TTL** (explicit operator decision): `navigator.sendBeacon('/api/jobs/{id}/discard')` fires on `pagehide` for whichever job is currently "active" on Tela 4 (or Tela 5, if a partial `.srt` survived a failed dub) — this is why Tela 4 has no "apagamos em 24h" messaging; the file lives until the visitor actually navigates away.
+
+**Trim bar — optional, uncapped.** After "Processar" resolves via `GET /api/probe`, the trim bar (Tela 2) always appears (any duration) with the full range pre-selected — leaving it untouched means the whole video is processed. It's a two-handle range (`#trim-window` with `.trim-grip.left`/`.trim-grip.right`), each independently draggable to narrow the clip, plus a body-drag to move the whole window; `setClipRange(start, end)` enforces `MIN_CLIP_SECONDS = 1` and recomputes `needsTrim` (`true` only when the range is narrower than the full video). On submit, `start`/`clip_duration` are included in the `POST /api/jobs` JSON body only when `needsTrim` is true. There's no local video preview (the source is a remote URL, not a local file) — just the track + time labels.
 
 ## Configuration (`.env` per service)
 

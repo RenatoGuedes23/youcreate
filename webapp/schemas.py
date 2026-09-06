@@ -6,6 +6,11 @@ class JobCreateRequest(BaseModel):
     url: str
     start: float = 0.0
     clip_duration: float | None = None
+    source_lang: str = "en"
+    target_lang: str = "pt"
+    include_subtitles: bool = True
+    video_title: str = ""
+    video_duration: float = 0.0
 
 
 class JobCreated(BaseModel):
@@ -17,11 +22,28 @@ class ProbeResult(BaseModel):
     title: str
 
 
+class LanguageOption(BaseModel):
+    code: str
+    name: str
+    enabled_as_target: bool
+
+
 class JobStatus(BaseModel):
     id: str
     status: str
     pct: int
     step: str
     message: str
-    video: str = ""
-    srt: str = ""
+    error_code: str = ""
+    created_at: float = 0.0
+    source_url: str = ""
+    source_lang: str = ""
+    video_title: str = ""
+    video_duration: float = 0.0
+    target_lang: str = ""
+    include_subtitles: bool = True
+    video_name: str = ""
+    srt_name: str = ""
+    video_url: str = ""
+    srt_url: str = ""
+    vtt_url: str = ""

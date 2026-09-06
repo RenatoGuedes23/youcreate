@@ -8,6 +8,7 @@ codigo compartilhado -- se o formato do hash ou o nome das chaves mudar
 aqui, precisa mudar la tambem.
 """
 import os
+import time
 import uuid
 from dataclasses import dataclass
 
@@ -42,17 +43,35 @@ def _channel(job_id: str) -> str:
 class JobRecord:
     id: str
     source_url: str
+    created_at: float = 0.0
     url_clip_start: float = 0.0
     url_clip_duration: float | None = None
-    status: str = "queued"   # queued|running|done|error
+    source_lang: str = ""
+    target_lang: str = ""
+    include_subtitles: bool = True
+    video_title: str = ""
+    video_duration: float = 0.0
+    status: str = "queued"   # queued|running|done|error|cancelled
     pct: int = 0
     step: str = ""
     message: str = ""
+    error_code: str = ""
+    cancel_requested: bool = False
     result_video: str = ""
     result_srt: str = ""
+    result_vtt: str = ""
 
 
-def create_job(source_url: str, url_clip_start: float = 0.0, url_clip_duration: float | None = None) -> str:
+def create_job(
+    source_url: str,
+    url_clip_start: float = 0.0,
+    url_clip_duration: float | None = None,
+    source_lang: str = "",
+    target_lang: str = "",
+    include_subtitles: bool = True,
+    video_title: str = "",
+    video_duration: float = 0.0,
+) -> str:
     """Cria o job no Redis e o enfileira para o worker pegar; devolve o id."""
     job_id = str(uuid.uuid4())
     r = _redis()
@@ -60,14 +79,23 @@ def create_job(source_url: str, url_clip_start: float = 0.0, url_clip_duration: 
     r.hset(key, mapping={
         "id": job_id,
         "source_url": source_url,
+        "created_at": time.time(),
         "url_clip_start": url_clip_start,
         "url_clip_duration": url_clip_duration if url_clip_duration is not None else "",
+        "source_lang": source_lang,
+        "target_lang": target_lang,
+        "include_subtitles": "1" if include_subtitles else "",
+        "video_title": video_title,
+        "video_duration": video_duration,
         "status": "queued",
         "pct": 0,
         "step": "",
         "message": "",
+        "error_code": "",
+        "cancel_requested": "",
         "result_video": "",
         "result_srt": "",
+        "result_vtt": "",
     })
     r.expire(key, JOB_TTL_SECONDS)
     r.rpush(QUEUE_KEY, job_id)
@@ -81,15 +109,35 @@ def get_job(job_id: str) -> JobRecord | None:
     return JobRecord(
         id=data["id"],
         source_url=data["source_url"],
+        created_at=float(data.get("created_at") or 0.0),
         url_clip_start=float(data.get("url_clip_start") or 0.0),
         url_clip_duration=float(data["url_clip_duration"]) if data.get("url_clip_duration") else None,
+        source_lang=data.get("source_lang", ""),
+        target_lang=data.get("target_lang", ""),
+        include_subtitles=data.get("include_subtitles", "1") == "1",
+        video_title=data.get("video_title", ""),
+        video_duration=float(data.get("video_duration") or 0.0),
         status=data.get("status", "queued"),
         pct=int(data.get("pct") or 0),
         step=data.get("step", ""),
         message=data.get("message", ""),
+        error_code=data.get("error_code", ""),
+        cancel_requested=data.get("cancel_requested") == "1",
         result_video=data.get("result_video", ""),
         result_srt=data.get("result_srt", ""),
+        result_vtt=data.get("result_vtt", ""),
     )
+
+
+def request_cancel(job_id: str) -> bool:
+    """Marca o job para ser cancelado na proxima checagem do worker (so entre
+    etapas, ver PipelineCancelled em engine/pipeline.py). Devolve False se o
+    job nao existe (ja pode ter terminado/expirado)."""
+    key = _job_key(job_id)
+    if not _redis().exists(key):
+        return False
+    _redis().hset(key, "cancel_requested", "1")
+    return True
 
 
 def subscribe(job_id: str) -> "redis.client.PubSub":

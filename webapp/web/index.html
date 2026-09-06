@@ -4,637 +4,715 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>youcreate</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
 <style>
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/assets/fonts/inter-cyrillic-ext.woff2') format('woff2');
+    unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/assets/fonts/inter-cyrillic.woff2') format('woff2');
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/assets/fonts/inter-greek-ext.woff2') format('woff2');
+    unicode-range: U+1F00-1FFF;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/assets/fonts/inter-greek.woff2') format('woff2');
+    unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/assets/fonts/inter-vietnamese.woff2') format('woff2');
+    unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/assets/fonts/inter-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/assets/fonts/inter-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url('/assets/fonts/inter-cyrillic-ext.woff2') format('woff2');
+    unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url('/assets/fonts/inter-cyrillic.woff2') format('woff2');
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url('/assets/fonts/inter-greek-ext.woff2') format('woff2');
+    unicode-range: U+1F00-1FFF;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url('/assets/fonts/inter-greek.woff2') format('woff2');
+    unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url('/assets/fonts/inter-vietnamese.woff2') format('woff2');
+    unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url('/assets/fonts/inter-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap;
+    src: url('/assets/fonts/inter-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
   :root {
     color-scheme: dark;
-    --bg: oklch(14% 0.012 260);
-    --panel: oklch(19% 0.014 260);
-    --panel-2: oklch(24% 0.016 260);
-    --border: oklch(31% 0.02 260);
-    --text: oklch(96% 0.004 260);
-    --muted: oklch(68% 0.02 260);
-    --accent: oklch(72% 0.16 42);
-    --accent-strong: oklch(64% 0.18 42);
-    --accent-soft: oklch(72% 0.16 42 / 0.14);
-    --on-accent: oklch(18% 0.03 42);
-    --success: oklch(76% 0.15 155);
-    --success-soft: oklch(76% 0.15 155 / 0.14);
-    --error: oklch(68% 0.18 25);
-    --error-soft: oklch(68% 0.18 25 / 0.14);
+    --bg: #0F0F0F;
+    --band: #161616;
+    --border: rgba(255,255,255,0.09);
+    --border-field: rgba(255,255,255,0.18);
+    --accent: #D85A30;
+    --accent-hover: #C24E28;
+    --accent-ink: #FFF1EA;
+    --accent-bg: #2A1108;
+    --accent-text: #C79178;
+    --error: #E2564B;
+    --surface: #1A1A1A;
+    --text: #F2F0EA;
+    --text-2: #A3A099;
+    --text-3: #5C5A55;
+    --lang: #6B6963;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    display: flex;
-    justify-content: center;
-    padding: 40px 16px 64px;
+    font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-weight: 400;
   }
-  main {
-    width: 100%;
-    max-width: 480px;
-    display: flex;
-    flex-direction: column;
-    gap: 22px;
-  }
-  a { color: var(--accent); }
-  a:hover { color: var(--accent-strong); }
+  a { color: inherit; }
   [hidden] { display: none !important; }
-
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 20px;
+  fieldset { border: none; margin: 0; padding: 0; }
+  legend { padding: 0; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
   }
 
-  /* Header */
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 64px; }
+
+  /* ============ Nav (compartilhada pelas duas telas) ============ */
+  .site-nav {
+    display: flex; align-items: center; gap: 20px;
+    padding: 22px 0;
   }
-  .logo-mark {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+  .brand {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 16px; font-weight: 700; text-decoration: none; color: var(--text);
   }
-  .header-text { display: flex; flex-direction: column; gap: 4px; }
-  .header-text .name {
-    font-family: 'Space Grotesk', sans-serif;
+  .brand-mark {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--accent); position: relative; flex-shrink: 0;
+  }
+  .brand-mark i {
+    position: absolute; display: block; width: 3px; border-radius: 2px;
+    background: var(--accent-ink);
+  }
+  .brand-mark i:nth-child(1) { left: 4px; top: 8px; height: 6px; }
+  .brand-mark i:nth-child(2) { left: 9px; top: 5px; height: 12px; }
+  .brand-mark i:nth-child(3) { left: 14px; top: 7px; height: 8px; }
+  .nav-links {
+    display: flex; align-items: center; gap: 30px;
+    margin-left: auto; font-size: 14px; color: var(--text-2);
+  }
+  .nav-links a { text-decoration: none; }
+  .nav-links a.is-current {
+    color: var(--text); border-bottom: 1px solid var(--accent); padding-bottom: 2px;
+  }
+  .nav-step { margin-left: auto; font-size: 13px; color: var(--text-3); }
+
+  /* ============ Tela 1: hero ============ */
+  .hero { padding: 60px 0 0; }
+  .hero h1 {
+    /* Fluido em vez de fixo: 104px (spec original) so em telas bem largas;
+       encolhe proporcionalmente em telas comuns em vez de saltar entre dois
+       tamanhos fixos num breakpoint. letter-spacing em em acompanha a escala. */
+    font-size: clamp(40px, 5.2vw, 104px);
+    line-height: 0.98;
     font-weight: 700;
-    font-size: 18px;
-    line-height: 1;
-  }
-  .header-text .tagline { font-size: 12px; color: var(--muted); }
-
-  /* Intro copy (hidden once a URL is carregada) */
-  #intro-block { display: flex; flex-direction: column; gap: 8px; }
-  #intro-block h1 {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 600;
-    font-size: 22px;
-    line-height: 1.3;
+    letter-spacing: -0.035em;
     margin: 0;
   }
-  #intro-block p {
-    font-size: 13.5px;
-    color: var(--muted);
-    line-height: 1.55;
-    margin: 0;
+  .hero h1 .thin { color: var(--text-3); }
+  .ruler { border-bottom: 1px solid var(--border); margin: 34px 0; }
+
+  .action-row { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; padding-bottom: 52px; }
+  .action-lead {
+    /* Antes: width fixo em 400px com flex-shrink:0 -- nao encolhia nunca,
+       forcando a linha a exigir 980px so das duas colunas. Com flex-basis +
+       min-width, ela encolhe de forma proporcional em telas intermediarias
+       em vez de estourar a largura ou espremer o formulario ao lado. */
+    flex: 1 1 320px; min-width: 240px;
+    font-size: 17px; line-height: 1.6; color: var(--text-2); margin: 0;
+  }
+  .action-form-wrap { flex: 2 1 420px; min-width: 280px; max-width: 540px; }
+  .url-form { display: flex; }
+  .url-field {
+    flex: 1; height: 58px; min-width: 0;
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border-field); border-right: none; border-radius: 0;
+    padding: 0 20px; font-size: 17px; font-family: inherit;
+  }
+  .url-field::placeholder { color: var(--text-3); }
+  .btn-process {
+    height: 58px; padding: 0 36px; flex-shrink: 0;
+    background: var(--accent); color: var(--accent-ink);
+    border: none; border-radius: 0;
+    font-family: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+  }
+  .btn-process:hover { background: var(--accent-hover); }
+  .field-error { font-size: 13px; color: var(--error); margin: 10px 0 0; }
+
+  /* ============ Tela 1: faixa de idiomas ============ */
+  .wall { border-top: 1px solid var(--border); background: var(--band); }
+  .wall-inner { padding: 40px 0 42px; }
+  .wall-list {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 16px 26px;
+  }
+  .wall-list li {
+    font-size: 26px; letter-spacing: -0.5px; line-height: 1.2; color: var(--lang);
+  }
+  .wall-list li.cjk { font-family: "Noto Sans CJK SC", "Noto Sans CJK JP", "Noto Sans KR", sans-serif; }
+
+  @media (max-width: 900px) {
+    .wrap { padding: 0 24px; }
+    .action-row { flex-direction: column; padding-bottom: 40px; }
+    .action-lead { width: 100%; }
+    .action-form-wrap { width: 100%; }
+    .url-form { flex-direction: column; }
+    .url-field { border-right: 1px solid var(--border-field); border-bottom: none; }
+    .btn-process { width: 100%; }
+    .wall-inner { padding: 28px 0 30px; }
+    .wall-list { gap: 12px 18px; }
+    .wall-list li { font-size: 18px; }
   }
 
-  /* URL card */
-  .url-card { display: flex; flex-direction: column; gap: 10px; }
-  .url-card-title { font-size: 14px; font-weight: 600; }
-  .url-card-hint { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
-  .url-input-row { display: flex; gap: 8px; }
-  .url-input-row input {
-    flex: 1;
-    min-width: 0;
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 11px 12px;
-    color: var(--text);
-    font-family: inherit;
-    font-size: 13.5px;
+  /* ============ Tela 2 ============ */
+  #screen-configure .wrap2 { max-width: 760px; margin: 0 auto; padding: 48px 24px 0; }
+  #screen-configure h1 {
+    font-size: 40px; font-weight: 700; letter-spacing: -0.035em;
+    margin: 0 0 34px;
   }
-  .url-input-row input:focus { outline: none; border-color: var(--accent); }
-  .url-input-row input:disabled { opacity: 0.6; }
-  .btn-inline { width: auto; padding: 11px 16px; white-space: nowrap; }
-  .url-error { font-size: 12.5px; color: var(--error); line-height: 1.5; }
 
-  /* Feature chips */
-  .chips-row { display: flex; gap: 10px; }
-  .chip {
-    flex: 1;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 10px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
+  .video-card {
+    display: flex; gap: 16px; align-items: flex-start;
+    border: 1px solid var(--border); padding: 16px; margin-bottom: 44px;
   }
-  .chip .label { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
+  .video-thumb {
+    width: 132px; height: 76px; flex-shrink: 0;
+    background: #0B0B0B; border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .video-thumb-play {
+    width: 0; height: 0;
+    border-top: 9px solid transparent; border-bottom: 9px solid transparent;
+    border-left: 14px solid var(--text-3);
+  }
+  .video-info { min-width: 0; padding-top: 4px; }
+  .video-title {
+    font-size: 16px; font-weight: 700; margin-bottom: 7px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .video-meta { font-size: 13px; color: var(--text-3); }
+  .video-meta a { color: var(--accent); text-decoration: none; margin-left: 14px; }
+  .video-meta a:hover { color: var(--accent-hover); }
 
-  /* Selected source bar */
-  .source-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border: 1.5px solid var(--accent);
-    padding: 14px 16px;
+  .lang-section { margin-bottom: 40px; }
+  .lang-section label { display: block; font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+  .lang-section .hint { font-size: 14px; color: var(--text-3); margin-bottom: 16px; }
+  .lang-select {
+    width: 100%; height: 56px;
+    border: 1px solid var(--border-field); background: var(--bg); color: var(--text);
+    padding: 0 18px; font-size: 16px; font-family: inherit;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235C5A55' stroke-width='1.6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 18px center;
   }
-  .source-row .icon-box {
-    width: 36px;
-    height: 36px;
-    border-radius: 9px;
-    background: var(--accent-soft);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .source-row .source-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .source-row .source-title {
-    font-size: 13.5px;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .source-row .source-meta { font-size: 11.5px; color: var(--muted); }
-  .btn-ghost-sm {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px 10px;
-    color: var(--muted);
-    font-family: inherit;
-    font-size: 11.5px;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-  .btn-ghost-sm:hover { color: var(--text); border-color: var(--muted); }
+  .lang-select:invalid { color: var(--text-3); }
+  .field-error[aria-live] { font-size: 13px; color: var(--error); margin: 8px 0 0; }
 
-  /* Trim card */
-  .trim-card { display: flex; flex-direction: column; gap: 16px; }
-  .trim-hint { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .subtitle-group { margin-bottom: 40px; }
+  .subtitle-group legend { font-size: 19px; font-weight: 700; margin-bottom: 6px; padding: 0; }
+  .subtitle-group .hint { font-size: 14px; color: var(--text-3); margin-bottom: 16px; }
+  .subtitle-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .subtitle-opt {
+    border: 1px solid var(--border-field); padding: 16px 18px; cursor: pointer;
+  }
+  .subtitle-opt input[type="radio"] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .subtitle-opt .name { display: block; font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+  .subtitle-opt .detail { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .subtitle-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-bg); }
+  .subtitle-opt:has(input:checked) .detail { color: var(--accent-text); }
+  .subtitle-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+  /* Corte (trim) -- secao extra, nao faz parte do spec original da Tela 2 */
   .trim-track {
-    position: relative;
-    height: 32px;
-    border-radius: 8px;
-    background: var(--panel-2);
-    touch-action: none;
+    position: relative; height: 32px;
+    background: var(--surface); border: 1px solid var(--border); touch-action: none;
   }
   .trim-window {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    min-width: 28px;
-    background: var(--accent);
-    border-radius: 8px;
-    cursor: grab;
+    position: absolute; top: 0; height: 100%; min-width: 28px;
+    background: var(--accent); cursor: grab;
   }
   .trim-window:active { cursor: grabbing; }
   .trim-grip {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    width: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: absolute; top: 0; height: 100%; width: 16px;
+    display: flex; align-items: center; justify-content: center;
     cursor: ew-resize;
   }
   .trim-grip.left { left: 0; }
   .trim-grip.right { right: 0; }
-  .trim-grip .bar {
-    width: 4px;
-    height: 16px;
-    border-radius: 2px;
-    background: oklch(18% 0.03 42 / 0.5);
-  }
+  .trim-grip .bar { width: 4px; height: 16px; border-radius: 2px; background: rgba(0,0,0,0.35); }
   .trim-times {
-    display: flex;
-    justify-content: space-between;
-    font-size: 11.5px;
-    color: var(--muted);
-    font-family: 'Space Grotesk', sans-serif;
+    display: flex; justify-content: space-between;
+    font-size: 11.5px; color: var(--text-3); margin-top: 8px;
   }
-  .trim-times .range { color: var(--text); font-weight: 600; }
+  .trim-times .range { color: var(--text); font-weight: 700; }
 
-  /* Buttons */
+  .configure-bar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+    border-top: 1px solid var(--border); margin-top: 8px; padding: 22px 0 60px;
+  }
+  .estimate { font-size: 13px; color: var(--text-3); margin-right: auto; }
+  .btn-secondary {
+    height: 54px; padding: 0 26px;
+    border: 1px solid var(--border-field); background: none; color: var(--text-2);
+    font-family: inherit; font-size: 15px; cursor: pointer;
+  }
+  .btn-secondary:hover { color: var(--text); }
   .btn-primary {
-    width: 100%;
-    padding: 14px;
-    border-radius: 12px;
-    border: none;
-    background: var(--accent);
-    color: var(--on-accent);
-    font-family: inherit;
-    font-size: 14.5px;
-    font-weight: 600;
-    cursor: pointer;
+    height: 54px; padding: 0 34px;
+    background: var(--accent); color: var(--accent-ink);
+    font-family: inherit; font-size: 16px; font-weight: 700;
+    border: none; cursor: pointer; white-space: nowrap;
   }
-  .btn-primary:disabled {
-    background: var(--panel-2);
-    color: var(--muted);
-    border: 1px solid var(--border);
-    cursor: not-allowed;
-  }
-  .btn-outline {
-    width: 100%;
-    padding: 13px;
-    border-radius: 12px;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--muted);
-    font-family: inherit;
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .btn-outline:hover { color: var(--text); border-color: var(--muted); }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { background: var(--surface); color: var(--text-3); cursor: not-allowed; }
 
-  /* Progress hero */
-  .progress-hero { display: flex; flex-direction: column; gap: 18px; }
-  .progress-hero .top-row { display: flex; align-items: flex-end; justify-content: space-between; }
-  .progress-hero .pct {
-    font-family: 'Space Grotesk', sans-serif;
-    font-weight: 700;
-    font-size: 38px;
-    line-height: 1;
+  @media (max-width: 640px) {
+    #screen-configure h1 { font-size: 30px; }
+    .video-card { flex-direction: column; }
+    .video-thumb { width: 100%; height: 160px; }
+    .subtitle-options { grid-template-columns: 1fr; }
+    .configure-bar { flex-direction: column; align-items: stretch; }
+    .configure-bar .btn-primary { order: 1; width: 100%; }
+    .configure-bar .btn-secondary { order: 2; width: 100%; }
+    .estimate { order: 3; margin-right: 0; text-align: center; }
   }
-  .progress-hero .message { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
-  .progress-hero .meta { font-size: 11px; color: var(--muted); text-align: right; line-height: 1.5; }
-  .waveform { display: flex; align-items: flex-end; gap: 3px; height: 44px; }
-  .waveform .bar { flex: 1; background: var(--panel-2); border-radius: 3px; transition: background 0.2s; }
-  .waveform .bar.lit { background: var(--accent); }
-  .waveform .bar.pulse { animation: pulse 1.4s ease-in-out infinite; }
 
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  /* ============ Tela 3: processando ============ */
+  .proc-wrap {
+    display: flex; flex-wrap: wrap-reverse; gap: 48px;
+    padding: 90px 64px 40px;
+  }
+  .proc-main { flex: 2 1 480px; min-width: 280px; overflow: hidden; }
+  .proc-pct {
+    font-size: clamp(64px, 9vw, 150px); letter-spacing: -0.04em;
+    font-weight: 700; line-height: 0.9; margin: 0;
+  }
+  .proc-now { font-size: 30px; letter-spacing: -0.02em; font-weight: 700; margin: 22px 0 12px; }
+  .proc-rest { font-size: 17px; color: var(--text-3); line-height: 1.9; }
+  .proc-rest .d { color: var(--text-2); }
+  .proc-side { flex: 1 1 320px; min-width: 260px; max-width: 420px; }
+  .proc-card { border: 1px solid var(--border); padding: 20px; }
+  .proc-thumb {
+    width: 100%; height: 190px; background: #0B0B0B; border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .proc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .proc-card-title { margin-top: 16px; font-size: 15px; font-weight: 700; }
+  .proc-card-meta { margin-top: 6px; font-size: 13px; color: var(--text-3); }
 
-  /* Steps list */
-  .steps-card { padding: 6px 20px; }
-  .step-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 13px 0;
+  .proc-band { border-top: 1px solid var(--border); }
+  .proc-band-inner {
+    display: flex; flex-wrap: wrap; gap: 10px 24px; justify-content: space-between;
+    padding: 24px 64px 70px;
   }
-  .step-row:not(:last-child) { border-bottom: 1px solid var(--border); }
-  .step-row .ring {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    border: 2px solid var(--border);
-    flex-shrink: 0;
-  }
-  .step-row .check { display: none; flex-shrink: 0; }
-  .step-row .label { font-size: 13.5px; color: var(--muted); }
-  .step-row .pct { margin-left: auto; font-size: 11px; color: var(--muted); }
-  .step-row.is-active .ring { border-color: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
-  .step-row.is-active .label { color: var(--text); font-weight: 600; }
-  .step-row.is-active .pct { color: var(--accent); font-weight: 600; }
-  .step-row.is-done .ring { display: none; }
-  .step-row.is-done .check { display: block; }
-  .step-row.is-done .label { color: var(--text); }
+  .proc-note { font-size: 14px; color: var(--text-2); max-width: 620px; }
+  .proc-eta { font-size: 13px; color: var(--text-3); white-space: nowrap; }
+  .link { color: var(--text-2); text-decoration: underline; cursor: pointer; background: none; border: none; font-family: inherit; font-size: inherit; padding: 0; }
+  .link:hover { color: var(--text); }
 
-  /* Result */
-  .status-card { display: flex; flex-direction: column; gap: 22px; }
-  .status-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 16px; }
-  .status-badge {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  @media (max-width: 720px) {
+    .proc-wrap { padding: 48px 24px 30px; flex-direction: column-reverse; }
+    .proc-band-inner { padding: 20px 24px 44px; flex-direction: column; align-items: flex-start; }
   }
-  .status-hero .headline { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 21px; }
-  .status-hero .subline { font-size: 13px; color: var(--muted); line-height: 1.5; }
 
-  .download-list { display: flex; flex-direction: column; gap: 12px; }
-  .download-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px;
+  /* ============ Tela 4: resultado ============ */
+  .result-wrap { max-width: 820px; margin: 0 auto; padding: 90px 24px 70px; }
+  .result-wrap h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 8px; }
+  .result-lead { font-size: 15px; color: var(--text-2); margin-bottom: 30px; }
+  .result-player { width: 100%; max-height: 460px; background: #000; display: block; border: 1px solid var(--border); }
+  .result-title { font-size: 19px; font-weight: 700; margin: 20px 0 6px; }
+  .result-meta { font-size: 13px; color: var(--text-3); }
+  .result-dl { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; }
+  .result-dl-card {
+    flex: 1 1 240px; border: 1px solid var(--border-field); padding: 18px 20px;
+    text-decoration: none; color: var(--text); display: block;
   }
-  .download-row .icon-box {
-    width: 42px;
-    height: 42px;
-    border-radius: 11px;
-    background: var(--panel-2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+  .result-dl-card.primary { border-color: var(--accent); background: var(--accent-bg); }
+  .result-dl-card b { display: block; font-size: 16px; font-weight: 700; margin-bottom: 5px; }
+  .result-dl-card span { font-size: 13px; color: var(--text-3); }
+  .result-dl-card.primary span { color: var(--accent-text); }
+  .result-footer {
+    margin-top: 26px; border-top: 1px solid var(--border); padding-top: 20px;
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px;
   }
-  .download-row .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .download-row .title { font-size: 13.5px; font-weight: 600; }
-  .download-row .meta { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .btn-download {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    border: none;
-    border-radius: 9px;
-    padding: 9px 14px;
-    font-family: inherit;
-    font-size: 12.5px;
-    font-weight: 600;
-    cursor: pointer;
-    flex-shrink: 0;
-    text-decoration: none;
-  }
-  .btn-download.solid { background: var(--accent); color: var(--on-accent); }
-  .btn-download.outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
 
-  /* Error message card */
-  .error-msg-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 16px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  @media (max-width: 640px) {
+    .result-wrap { padding: 48px 20px 50px; }
+    .result-wrap h1 { font-size: 28px; }
+    .result-player { max-height: none; aspect-ratio: 16 / 9; }
   }
-  .error-msg-card .tag { display: flex; align-items: center; gap: 8px; }
-  .error-msg-card .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--error); }
-  .error-msg-card .tag-text { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-  .error-msg-card .body { font-size: 13px; line-height: 1.55; font-family: 'IBM Plex Mono', monospace; }
+
+  /* ============ Tela 5: erro ============ */
+  .error-wrap { max-width: 640px; margin: 0 auto; padding: 130px 24px 60px; text-align: center; }
+  .error-bar { width: 48px; height: 3px; background: var(--error); margin: 0 auto 28px; }
+  .error-title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 16px; }
+  .error-title:focus-visible { outline: none; }
+  .error-body { font-size: 16px; line-height: 1.6; color: var(--text-2); margin: 0 auto 34px; max-width: 460px; }
+  .error-actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .error-actions .btn-primary, .error-actions .btn-secondary { height: 52px; }
+  .error-footer { margin-top: 26px; font-size: 13px; color: var(--text-3); word-break: break-all; }
+
+  @media (max-width: 480px) {
+    .error-wrap { padding: 90px 20px 50px; }
+    .error-actions { flex-direction: column; align-items: stretch; }
+  }
 </style>
 </head>
 <body>
+
+<header>
+  <nav class="site-nav wrap">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      youcreate
+    </a>
+    <div class="nav-links" id="nav-links">
+      <a href="#">Como funciona</a>
+      <a href="#">Idiomas</a>
+      <a href="#">Preços</a>
+      <a href="#" class="is-current">Entrar</a>
+    </div>
+    <div class="nav-step" id="nav-step" hidden>passo 2 de 2</div>
+  </nav>
+</header>
+
 <main>
 
-  <div class="header">
-    <div class="logo-mark">
-      <svg width="18" height="16" viewBox="0 0 20 16" fill="none">
-        <rect x="0" y="6" width="2.6" height="4" rx="1.3" fill="var(--accent)"/>
-        <rect x="4.6" y="2" width="2.6" height="12" rx="1.3" fill="var(--accent)"/>
-        <rect x="9.2" y="0" width="2.6" height="16" rx="1.3" fill="var(--accent)"/>
-        <rect x="13.8" y="3" width="2.6" height="10" rx="1.3" fill="var(--accent)"/>
-        <rect x="18.4" y="5.5" width="1.6" height="5" rx="0.8" fill="var(--accent)" opacity="0.5"/>
-      </svg>
-    </div>
-    <div class="header-text">
-      <div class="name">youcreate</div>
-      <div class="tagline">Localização de vídeo &middot; EN &rarr; PT-BR</div>
-    </div>
-  </div>
-
-  <div id="intro-block">
-    <h1>Cole o link de um vídeo do YouTube em inglês.<br>Devolvemos com voz e legenda em PT-BR.</h1>
-    <p>O vídeo é baixado, processado e apagado automaticamente &mdash; sem marca d'água.</p>
-  </div>
-
-  <div class="card url-card" id="url-card">
-    <div class="url-card-title">Link do vídeo</div>
-    <div class="url-card-hint">
-      Cole a URL de um vídeo do YouTube. Ele é baixado no servidor (só o
-      trecho escolhido, quando houver corte) e apagado assim que o
-      processamento terminar.
-    </div>
-    <div class="url-input-row">
-      <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=...">
-      <button type="button" class="btn-primary btn-inline" id="url-load-btn">Carregar</button>
-    </div>
-    <div class="url-error" id="url-error" hidden></div>
-  </div>
-
-  <div class="chips-row" id="feature-chips">
-    <div class="chip">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/>
-        <path d="M19 11a7 7 0 0 1-14 0"/>
-        <path d="M12 18v3"/>
-      </svg>
-      <div class="label">Transcrição<br>local</div>
-    </div>
-    <div class="chip">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="9"/>
-        <path d="M3 12h18M12 3a13 13 0 0 1 0 18 13 13 0 0 1 0-18Z"/>
-      </svg>
-      <div class="label">Tradução<br>PT-BR</div>
-    </div>
-    <div class="chip">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="9" width="2.4" height="6" rx="1.2"/>
-        <rect x="8" y="5.5" width="2.4" height="13" rx="1.2"/>
-        <rect x="13" y="2.5" width="2.4" height="19" rx="1.2"/>
-        <rect x="18" y="7" width="2.4" height="10" rx="1.2"/>
-      </svg>
-      <div class="label">Dublagem<br>natural</div>
-    </div>
-  </div>
-
-  <div class="card source-row" id="source-card" hidden>
-    <div class="icon-box">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="5" width="20" height="14" rx="2.5"/>
-        <path d="M9.5 9.5v5l4.5-2.5-4.5-2.5Z" fill="var(--accent)" stroke="none"/>
-      </svg>
-    </div>
-    <div class="source-info">
-      <div class="source-title" id="source-title"></div>
-      <div class="source-meta" id="source-meta"></div>
-    </div>
-    <button type="button" class="btn-ghost-sm" id="change-source-btn">Trocar</button>
-  </div>
-
-  <div class="card trim-card" id="trim-section" hidden>
-    <div class="trim-hint">Escolha o trecho a localizar arrastando as bordas &mdash; ou deixe a faixa inteira selecionada para processar o vídeo todo.</div>
-
-    <div>
-      <div class="trim-track" id="trim-track">
-        <div class="trim-window" id="trim-window">
-          <div class="trim-grip left" id="grip-left"><span class="bar"></span></div>
-          <div class="trim-grip right" id="grip-right"><span class="bar"></span></div>
+  <!-- ===================== TELA 1 ===================== -->
+  <section id="screen-home">
+    <div class="hero wrap">
+      <h1>Seu vídeo fala<br><span class="thin">o idioma de</span> quem assiste</h1>
+      <div class="ruler"></div>
+      <div class="action-row">
+        <p class="action-lead">Cole o link e escolha o idioma de saída. Você recebe o vídeo com voz e legenda prontas.</p>
+        <div class="action-form-wrap">
+          <form id="process-form" class="url-form" novalidate>
+            <label class="sr-only" for="url-input">Link do vídeo</label>
+            <input type="url" inputmode="url" id="url-input" class="url-field" placeholder="youtube.com/watch?v=…" autocomplete="off">
+            <button type="submit" class="btn-process" id="process-btn">Processar</button>
+          </form>
+          <p class="field-error" id="url-error" hidden role="alert"></p>
         </div>
       </div>
-      <div class="trim-times" style="margin-top:8px;">
-        <span id="trim-start-label">00:00</span>
-        <span class="range" id="trim-range-label">00:00 &ndash; 00:00</span>
-        <span id="trim-total-label">00:00</span>
+    </div>
+
+    <section class="wall" aria-label="Idiomas suportados">
+      <div class="wall-inner wrap">
+        <ul class="wall-list" id="wall-list"></ul>
       </div>
-    </div>
-  </div>
+    </section>
+  </section>
 
-  <button class="btn-primary" id="submit-btn" disabled>Traduzir e legendar</button>
+  <!-- ===================== TELA 2 ===================== -->
+  <section id="screen-configure" hidden>
+    <div class="wrap2">
 
-  <div class="card progress-hero" id="progress-section" hidden>
-    <div class="top-row">
-      <div>
-        <div class="pct" id="progress-pct">0%</div>
-        <div class="message" id="progress-msg"></div>
-      </div>
-      <div class="meta" id="progress-meta">Etapa 0 de 6</div>
-    </div>
-    <div class="waveform" id="waveform"></div>
-  </div>
+    <form id="configure-form" novalidate>
 
-  <div class="card steps-card" id="steps-card" hidden>
-    <div class="step-row" id="step-audio">
-      <span class="ring"></span>
-      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      <span class="label">Extraindo áudio</span>
-      <span class="pct">5%</span>
-    </div>
-    <div class="step-row" id="step-transcribe">
-      <span class="ring"></span>
-      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      <span class="label">Transcrevendo</span>
-      <span class="pct">20%</span>
-    </div>
-    <div class="step-row" id="step-translate">
-      <span class="ring"></span>
-      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      <span class="label">Traduzindo</span>
-      <span class="pct">45%</span>
-    </div>
-    <div class="step-row" id="step-subtitle">
-      <span class="ring"></span>
-      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      <span class="label">Gerando legenda</span>
-      <span class="pct">60%</span>
-    </div>
-    <div class="step-row" id="step-dub">
-      <span class="ring"></span>
-      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      <span class="label">Dublando</span>
-      <span class="pct">75%</span>
-    </div>
-    <div class="step-row" id="step-render">
-      <span class="ring"></span>
-      <svg class="check" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      <span class="label">Renderizando</span>
-      <span class="pct">90%</span>
-    </div>
-  </div>
+      <h1>Como você quer esse vídeo?</h1>
 
-  <div class="card status-card" id="result-section" hidden>
-    <div class="status-hero">
-      <div class="status-badge" style="background:var(--success-soft); border:1.5px solid var(--success);">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-      </div>
-      <div>
-        <div class="headline">Tudo pronto!</div>
-        <div class="subline">Seu vídeo foi legendado e dublado para português do Brasil.</div>
-      </div>
-    </div>
-
-    <div class="download-list">
-      <div class="download-row" id="video-download-row" hidden>
-        <div class="icon-box">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="5" width="20" height="14" rx="2.5"/>
-            <path d="M9.5 9.5v5l4.5-2.5-4.5-2.5Z" fill="var(--accent)" stroke="none"/>
-          </svg>
+      <div class="video-card">
+        <div class="video-thumb">
+          <span class="video-thumb-play" aria-hidden="true" id="video-thumb-play"></span>
+          <img id="video-thumb-img" src="" alt="" hidden>
         </div>
-        <div class="info">
-          <div class="title">Vídeo dublado</div>
-          <div class="meta" id="video-file-name"></div>
+        <div class="video-info">
+          <div class="video-title" id="video-title"></div>
+          <div class="video-meta">
+            <span id="video-duration"></span>
+            <a href="#" id="change-link-btn">Trocar link</a>
+          </div>
         </div>
-        <a id="video-link" class="btn-download solid" href="#">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--on-accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5"/><path d="M4 20h16"/></svg>
-          Baixar
+      </div>
+
+      <div class="lang-section">
+        <label for="source-lang-select">Idioma do vídeo</label>
+        <p class="hint">Em que idioma o vídeo original é falado.</p>
+        <select class="lang-select" id="source-lang-select" required aria-describedby="source-lang-error"></select>
+        <p class="field-error" id="source-lang-error" hidden aria-live="polite">Escolha o idioma falado no vídeo</p>
+      </div>
+
+      <div class="lang-section">
+        <label for="target-lang-select">Traduzir para</label>
+        <p class="hint">O idioma da voz e das legendas geradas.</p>
+        <select class="lang-select" id="target-lang-select" required aria-describedby="target-lang-error"></select>
+        <p class="field-error" id="target-lang-error" hidden aria-live="polite">Escolha o idioma de destino</p>
+      </div>
+
+      <fieldset class="subtitle-group">
+        <legend>Legendas</legend>
+        <p class="hint">Queimadas no vídeo ou nenhum texto na tela.</p>
+        <div class="subtitle-options">
+          <label class="subtitle-opt">
+            <input type="radio" name="subtitles" value="yes" checked>
+            <span class="name">Com legenda</span>
+            <span class="detail">MP4 com legenda e arquivo SRT separado</span>
+          </label>
+          <label class="subtitle-opt">
+            <input type="radio" name="subtitles" value="no">
+            <span class="name">Só a voz</span>
+            <span class="detail">MP4 dublado, sem texto na tela</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="lang-section" id="trim-section" hidden>
+        <legend>Corte</legend>
+        <p class="hint">Escolha o trecho a localizar arrastando as bordas (opcional) — ou deixe a faixa inteira selecionada para processar o vídeo todo.</p>
+        <div class="trim-track" id="trim-track">
+          <div class="trim-window" id="trim-window">
+            <div class="trim-grip left" id="grip-left"><span class="bar"></span></div>
+            <div class="trim-grip right" id="grip-right"><span class="bar"></span></div>
+          </div>
+        </div>
+        <div class="trim-times">
+          <span id="trim-start-label">00:00</span>
+          <span class="range" id="trim-range-label">00:00 – 00:00</span>
+          <span id="trim-total-label">00:00</span>
+        </div>
+      </fieldset>
+
+      <div class="configure-bar">
+        <span class="estimate" id="estimate-label"></span>
+        <button type="button" class="btn-secondary" id="back-btn">Voltar</button>
+        <button type="submit" class="btn-primary" id="submit-btn">Gerar vídeo</button>
+      </div>
+      <p class="field-error" id="submit-error" hidden role="alert"></p>
+    </form>
+
+    </div>
+  </section>
+
+  <!-- ===================== TELA 3: processando ===================== -->
+  <section id="screen-processing" hidden>
+    <div class="wrap proc-wrap">
+      <div class="proc-main">
+        <p class="proc-pct" id="proc-pct" aria-hidden="true">0%</p>
+        <p class="proc-now" id="proc-now">Preparando</p>
+        <p class="proc-rest" id="proc-rest"></p>
+        <p class="sr-only" role="status" aria-live="polite" id="proc-announce"></p>
+      </div>
+      <div class="proc-side">
+        <div class="proc-card">
+          <div class="proc-thumb">
+            <span class="video-thumb-play" aria-hidden="true" id="proc-thumb-play"></span>
+            <img id="proc-thumb-img" src="" alt="" hidden>
+          </div>
+          <div class="proc-card-title" id="proc-title"></div>
+          <div class="proc-card-meta" id="proc-meta"></div>
+        </div>
+      </div>
+    </div>
+    <div class="proc-band">
+      <div class="wrap proc-band-inner">
+        <div class="proc-note" id="proc-note">Pode fechar a aba — o processamento continua e você pode voltar a este link depois.</div>
+        <div class="proc-eta">
+          <span id="proc-eta-label">Calculando tempo restante…</span>
+          &nbsp;&nbsp;<span id="proc-cancel-wrap"><a href="#" class="link" id="proc-cancel-link">Cancelar</a></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== TELA 4: resultado ===================== -->
+  <section id="screen-result" hidden>
+    <div class="result-wrap">
+      <h1>Seu vídeo está pronto</h1>
+      <div class="result-lead" id="result-lead"></div>
+      <video class="result-player" id="result-player" controls>
+        <track id="result-track" kind="subtitles" srclang="pt" label="Português">
+      </video>
+      <div class="result-title" id="result-title"></div>
+      <div class="result-meta" id="result-meta"></div>
+      <div class="result-dl">
+        <a class="result-dl-card primary" id="result-video-card" href="#">
+          <b>Baixar MP4</b><span id="result-video-meta"></span>
+        </a>
+        <a class="result-dl-card" id="result-srt-card" href="#" hidden>
+          <b>Baixar SRT</b><span id="result-srt-meta"></span>
         </a>
       </div>
-
-      <div class="download-row" id="srt-download-row" hidden>
-        <div class="icon-box">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="4" width="20" height="16" rx="2.5"/>
-            <path d="M6 15h4M12 15h6M6 11h12"/>
-          </svg>
-        </div>
-        <div class="info">
-          <div class="title">Legenda</div>
-          <div class="meta" id="srt-file-name"></div>
-        </div>
-        <a id="srt-link" class="btn-download outline" href="#">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5"/><path d="M4 20h16"/></svg>
-          Baixar
-        </a>
+      <div class="result-footer">
+        <button type="button" class="link" id="result-restart-btn">Processar outro vídeo</button>
+        <a class="link" href="#" id="result-retranslate-link">Traduzir para outro idioma</a>
       </div>
     </div>
+  </section>
 
-    <button type="button" class="btn-outline" id="reset-btn">Processar outro vídeo</button>
-  </div>
-
-  <div class="card status-card" id="error-section" hidden>
-    <div class="status-hero">
-      <div class="status-badge" style="background:var(--error-soft); border:1.5px solid var(--error);">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 9v4M12 17h.01"/>
-          <path d="M10.3 3.9 2.5 17.5A1.5 1.5 0 0 0 3.8 20h16.4a1.5 1.5 0 0 0 1.3-2.5L13.7 3.9a1.5 1.5 0 0 0-2.6 0Z"/>
-        </svg>
+  <!-- ===================== TELA 5: erro ===================== -->
+  <section id="screen-error" hidden role="alert">
+    <div class="error-wrap">
+      <div class="error-bar" aria-hidden="true"></div>
+      <h1 class="error-title" id="error-title" tabindex="-1"></h1>
+      <p class="error-body" id="error-body"></p>
+      <div class="error-actions">
+        <button type="button" class="btn-primary" id="error-primary-btn"></button>
+        <button type="button" class="btn-secondary" id="error-secondary-btn"></button>
       </div>
-      <div>
-        <div class="headline">Não foi possível concluir</div>
-        <div class="subline" id="error-subline">A etapa de processamento falhou.</div>
-      </div>
+      <div class="error-footer" id="error-footer"></div>
     </div>
-
-    <div class="error-msg-card">
-      <div class="tag">
-        <span class="dot"></span>
-        <span class="tag-text" id="error-meta">falhou</span>
-      </div>
-      <div class="body" id="error-msg"></div>
-    </div>
-
-    <div class="download-row" id="error-srt-row" hidden>
-      <div class="icon-box">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="4" width="20" height="16" rx="2.5"/>
-          <path d="M6 15h4M12 15h6M6 11h12"/>
-        </svg>
-      </div>
-      <div class="info">
-        <div class="title">Legenda disponível</div>
-        <div class="meta" id="error-srt-name"></div>
-      </div>
-      <a id="error-srt-link" class="btn-download outline" href="#">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5"/><path d="M4 20h16"/></svg>
-        Baixar
-      </a>
-    </div>
-
-    <button type="button" class="btn-primary" id="retry-btn">
-      Tentar novamente
-    </button>
-  </div>
+  </section>
 
 </main>
 
 <script>
   const MIN_CLIP_SECONDS = 1;
-  const STEPS = [
-    { id: 'audio', label: 'Extraindo áudio', pct: 5 },
-    { id: 'transcribe', label: 'Transcrevendo', pct: 20 },
-    { id: 'translate', label: 'Traduzindo', pct: 45 },
-    { id: 'subtitle', label: 'Gerando legenda', pct: 60 },
-    { id: 'dub', label: 'Dublando', pct: 75 },
-    { id: 'render', label: 'Renderizando', pct: 90 },
-  ];
+  const CJK_CODES = new Set(['ja', 'zh', 'ko']);
+  const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
 
-  const introBlock = document.getElementById('intro-block');
-  const featureChips = document.getElementById('feature-chips');
-  const submitBtn = document.getElementById('submit-btn');
+  // Estagios exibidos na Tela 3 -- mapeiam os step_ids internos do motor
+  // (worker/engine/pipeline.py) para os 5 rotulos que o usuario ve. pct vem
+  // direto do backend (ja pondera as etapas por peso real de tempo, ver
+  // pipeline.py); aqui so trocamos de rotulo quando o step muda, sem
+  // interpolar nada entre uma atualizacao e outra (decisao deliberada).
+  const PROC_LABELS = {
+    download: 'Baixando o vídeo',
+    audio: 'Baixando o vídeo',
+    transcribe: 'Transcrevendo o áudio',
+    translate: 'Traduzindo o texto',
+    subtitle: 'Traduzindo o texto',
+    dub: 'Gerando a voz',
+    render: 'Montando o vídeo',
+    done: 'Concluído',
+  };
+  const PROC_STAGES = ['Baixando o vídeo', 'Transcrevendo o áudio', 'Traduzindo o texto', 'Gerando a voz', 'Montando o vídeo'];
 
+  // Tela 5: mapa codigo de erro -> conteudo. E um componente generico e
+  // extensivel -- novos codigos que o worker passar a classificar (ver
+  // worker/worker.py::_classify_error) so precisam de uma entrada aqui.
+  // Codigo desconhecido ou vazio cai no fallback falha_interna.
+  const ERROR_CONTENT = {
+    video_privado: {
+      title: 'Esse vídeo é privado',
+      body: 'O YouTube não libera o download de vídeos privados ou não listados.',
+      primary: { label: 'Usar outro link', action: 'home' },
+      secondary: { label: 'Tentar de novo', action: 'retry' },
+    },
+    video_indisponivel: {
+      title: 'Esse vídeo não está mais disponível',
+      body: 'Ele pode ter sido removido ou a conta do canal que publicou foi encerrada.',
+      primary: { label: 'Usar outro link', action: 'home' },
+      secondary: { label: 'Tentar de novo', action: 'retry' },
+    },
+    restrito_regiao: {
+      title: 'Esse vídeo está bloqueado nessa região',
+      body: 'Quem publicou restringiu esse vídeo em alguns países, e o download não pôde ser concluído.',
+      primary: { label: 'Usar outro link', action: 'home' },
+      secondary: { label: 'Tentar de novo', action: 'retry' },
+    },
+    video_longo: {
+      title: 'Esse vídeo é longo demais',
+      body: 'No momento não processamos vídeos com mais desse tamanho. Tente ajustar o corte para um trecho menor.',
+      primary: { label: 'Ajustar corte', action: 'configurar' },
+      secondary: { label: 'Usar outro link', action: 'home' },
+    },
+    sem_audio: {
+      title: 'Não encontramos áudio nesse vídeo',
+      body: 'Um vídeo sem faixa de áudio não pode ser dublado nem legendado.',
+      primary: { label: 'Usar outro link', action: 'home' },
+      secondary: null,
+    },
+    cancelado: {
+      title: 'Processamento cancelado',
+      body: 'Você cancelou antes de terminar. Nenhum arquivo foi gerado.',
+      primary: { label: 'Tentar de novo', action: 'retry' },
+      secondary: { label: 'Usar outro link', action: 'home' },
+    },
+    job_nao_encontrado: {
+      title: 'Não encontramos esse processamento',
+      body: 'O link pode estar incorreto, ou os dados desse job já expiraram.',
+      primary: { label: 'Usar outro link', action: 'home' },
+      secondary: null,
+    },
+    falha_interna: {
+      title: 'Algo deu errado do nosso lado',
+      body: 'Não foi por causa do vídeo — tivemos uma falha interna ao processar.',
+      primary: { label: 'Tentar de novo', action: 'retry' },
+      secondary: { label: 'Usar outro link', action: 'home' },
+    },
+  };
+
+  let LANGUAGES = [];
+
+  const wallList = document.getElementById('wall-list');
+
+  const processForm = document.getElementById('process-form');
   const urlInput = document.getElementById('url-input');
-  const urlLoadBtn = document.getElementById('url-load-btn');
+  const processBtn = document.getElementById('process-btn');
   const urlError = document.getElementById('url-error');
 
-  const sourceCard = document.getElementById('source-card');
-  const sourceTitleEl = document.getElementById('source-title');
-  const sourceMetaEl = document.getElementById('source-meta');
-  const changeSourceBtn = document.getElementById('change-source-btn');
+  const navLinks = document.getElementById('nav-links');
+  const navStep = document.getElementById('nav-step');
+
+  const screenHome = document.getElementById('screen-home');
+  const screenConfigure = document.getElementById('screen-configure');
+  const screenProcessing = document.getElementById('screen-processing');
+  const screenResult = document.getElementById('screen-result');
+  const screenError = document.getElementById('screen-error');
+
+  const videoThumbPlay = document.getElementById('video-thumb-play');
+  const videoThumbImg = document.getElementById('video-thumb-img');
+  const videoTitleEl = document.getElementById('video-title');
+  const videoDurationEl = document.getElementById('video-duration');
+  const changeLinkBtn = document.getElementById('change-link-btn');
+
+  const sourceLangSelect = document.getElementById('source-lang-select');
+  const sourceLangError = document.getElementById('source-lang-error');
+  const targetLangSelect = document.getElementById('target-lang-select');
+  const targetLangError = document.getElementById('target-lang-error');
+  const estimateLabelEl = document.getElementById('estimate-label');
 
   const trimSection = document.getElementById('trim-section');
   const trimTrack = document.getElementById('trim-track');
@@ -645,57 +723,59 @@
   const trimRangeLabel = document.getElementById('trim-range-label');
   const trimTotalLabel = document.getElementById('trim-total-label');
 
+  const configureForm = document.getElementById('configure-form');
+  const backBtn = document.getElementById('back-btn');
+  const submitBtn = document.getElementById('submit-btn');
+  const submitErrorEl = document.getElementById('submit-error');
+
+  const procPctEl = document.getElementById('proc-pct');
+  const procNowEl = document.getElementById('proc-now');
+  const procRestEl = document.getElementById('proc-rest');
+  const procAnnounceEl = document.getElementById('proc-announce');
+  const procThumbImg = document.getElementById('proc-thumb-img');
+  const procThumbPlay = document.getElementById('proc-thumb-play');
+  const procTitleEl = document.getElementById('proc-title');
+  const procMetaEl = document.getElementById('proc-meta');
+  const procNoteEl = document.getElementById('proc-note');
+  const procEtaLabelEl = document.getElementById('proc-eta-label');
+  const procCancelWrap = document.getElementById('proc-cancel-wrap');
+
+  const resultLeadEl = document.getElementById('result-lead');
+  const resultPlayer = document.getElementById('result-player');
+  const resultTrack = document.getElementById('result-track');
+  const resultTitleEl = document.getElementById('result-title');
+  const resultMetaEl = document.getElementById('result-meta');
+  const resultVideoCard = document.getElementById('result-video-card');
+  const resultVideoMetaEl = document.getElementById('result-video-meta');
+  const resultSrtCard = document.getElementById('result-srt-card');
+  const resultSrtMetaEl = document.getElementById('result-srt-meta');
+  const resultRestartBtn = document.getElementById('result-restart-btn');
+  const resultRetranslateLink = document.getElementById('result-retranslate-link');
+
+  const errorTitleEl = document.getElementById('error-title');
+  const errorBodyEl = document.getElementById('error-body');
+  const errorPrimaryBtn = document.getElementById('error-primary-btn');
+  const errorSecondaryBtn = document.getElementById('error-secondary-btn');
+  const errorFooterEl = document.getElementById('error-footer');
+
   let sourceUrl = '';
   let videoDuration = 0;
   let clipStart = 0;
   let clipEnd = 0;
   let needsTrim = false;
-
-  // Job com resultado (video/srt) ainda disponivel para download nesta tela.
-  // Descartado (arquivos apagados no servidor) ao sair dela -- ver
-  // discardActiveResult() e resetSelection()/pagehide abaixo.
   let activeResultJobId = '';
+  let currentJobId = '';
+  let jobEventSource = null;
+  let procStallTimer = null;
+  let procLastUpdate = 0;
+  let procEtaTotalMin = 1;
 
   function discardActiveResult() {
     if (!activeResultJobId) return;
     navigator.sendBeacon(`/api/jobs/${activeResultJobId}/discard`);
     activeResultJobId = '';
   }
-
   window.addEventListener('pagehide', discardActiveResult);
-
-  const progressSection = document.getElementById('progress-section');
-  const progressPct = document.getElementById('progress-pct');
-  const progressMsg = document.getElementById('progress-msg');
-  const progressMeta = document.getElementById('progress-meta');
-  const waveform = document.getElementById('waveform');
-  const stepsCard = document.getElementById('steps-card');
-
-  const resultSection = document.getElementById('result-section');
-  const videoDownloadRow = document.getElementById('video-download-row');
-  const videoLink = document.getElementById('video-link');
-  const videoFileName = document.getElementById('video-file-name');
-  const srtDownloadRow = document.getElementById('srt-download-row');
-  const srtLink = document.getElementById('srt-link');
-  const srtFileName = document.getElementById('srt-file-name');
-  const resetBtn = document.getElementById('reset-btn');
-
-  const errorSection = document.getElementById('error-section');
-  const errorMsg = document.getElementById('error-msg');
-  const errorMeta = document.getElementById('error-meta');
-  const errorSrtRow = document.getElementById('error-srt-row');
-  const errorSrtName = document.getElementById('error-srt-name');
-  const errorSrtLink = document.getElementById('error-srt-link');
-  const retryBtn = document.getElementById('retry-btn');
-
-  const WAVE_HEIGHTS = [38, 70, 50, 90, 60, 75, 45, 80, 55, 65, 40, 30, 58, 35, 48, 28, 52, 33];
-  WAVE_HEIGHTS.forEach(() => {
-    const bar = document.createElement('div');
-    bar.className = 'bar';
-    waveform.appendChild(bar);
-  });
-
-  let lastStep = { label: '', pct: 0 };
 
   function formatTime(seconds) {
     const total = Math.max(0, Math.round(seconds));
@@ -707,37 +787,239 @@
     return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   }
 
-  urlLoadBtn.addEventListener('click', loadFromUrl);
-  urlInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); loadFromUrl(); }
+  // ---------- Idiomas (vem do backend, nunca hardcoded aqui) ----------
+  async function loadLanguages() {
+    try {
+      const resp = await fetch('/api/languages');
+      LANGUAGES = await resp.json();
+    } catch (e) {
+      LANGUAGES = [];
+    }
+    renderLanguageWall();
+    refreshLangSelects();
+    preselectTargetFromBrowser();
+  }
+
+  function renderLanguageWall() {
+    if (!LANGUAGES.length) { wallList.hidden = true; return; }
+    wallList.innerHTML = LANGUAGES.map((l) => {
+      const cls = CJK_CODES.has(l.code) ? ' class="cjk"' : '';
+      return `<li${cls}>${l.name}</li>`;
+    }).join('');
+  }
+
+  // Select nativo: a busca por digitacao (pular para a opcao ao teclar a
+  // primeira letra) e comportamento padrao do navegador, sem JS extra.
+  function renderLangSelect(select, { excludeCode, targetOnly }) {
+    const previous = select.value;
+    select.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Selecione o idioma';
+    placeholder.disabled = true;
+    placeholder.hidden = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+
+    LANGUAGES.forEach((lang) => {
+      const opt = document.createElement('option');
+      opt.value = lang.code;
+      const comingSoon = targetOnly && !lang.enabled_as_target;
+      opt.disabled = comingSoon || lang.code === excludeCode;
+      opt.textContent = comingSoon ? `${lang.name} (em breve)` : lang.name;
+      select.appendChild(opt);
+    });
+
+    if (previous && [...select.options].some((o) => o.value === previous && !o.disabled)) {
+      select.value = previous;
+    }
+  }
+
+  // Um idioma escolhido em um campo fica indisponivel no outro (traduzir de
+  // um idioma para ele mesmo nao e um caso valido) -- reconstroi os dois
+  // selects sempre que qualquer um deles muda.
+  function refreshLangSelects() {
+    renderLangSelect(sourceLangSelect, { excludeCode: targetLangSelect.value, targetOnly: false });
+    renderLangSelect(targetLangSelect, { excludeCode: sourceLangSelect.value, targetOnly: true });
+  }
+
+  function preselectTargetFromBrowser() {
+    const primary = (navigator.language || '').slice(0, 2).toLowerCase();
+    const match = LANGUAGES.find((l) => l.code === primary && l.enabled_as_target);
+    if (match) {
+      targetLangSelect.value = match.code;
+      refreshLangSelects();
+    }
+  }
+
+  sourceLangSelect.addEventListener('change', () => {
+    sourceLangError.hidden = true;
+    refreshLangSelects();
+  });
+  targetLangSelect.addEventListener('change', () => {
+    targetLangError.hidden = true;
+    refreshLangSelects();
   });
 
-  async function loadFromUrl() {
-    const value = urlInput.value.trim();
-    urlError.hidden = true;
-    if (!value) return;
+  function getSelected(groupName) {
+    const el = configureForm.querySelector(`input[name="${groupName}"]:checked`);
+    return el ? el.value : '';
+  }
 
-    urlLoadBtn.disabled = true;
-    urlLoadBtn.textContent = 'Carregando…';
+  function showFieldError(select, errorEl, message) {
+    errorEl.hidden = false;
+    errorEl.textContent = message;
+    select.focus();
+    select.scrollIntoView({ block: 'center' });
+  }
+
+  // ---------- Estimativa de tempo ----------
+  // Heuristica simples, nao e medicao real: transcricao/traducao/dublagem
+  // escalam com a duracao do video: queimar legenda faz o render reprocessar
+  // o video inteiro (mais lento) contra so copiar o stream (mais rapido).
+  function updateEstimate() {
+    if (!videoDuration) { estimateLabelEl.textContent = ''; return; }
+    const includeSubtitles = getSelected('subtitles') !== 'no';
+    const minutes = videoDuration / 60;
+    const factor = includeSubtitles ? 0.35 : 0.25;
+    const mins = Math.max(1, Math.round(1 + minutes * factor));
+    estimateLabelEl.textContent = `Cerca de ${mins} minuto${mins === 1 ? '' : 's'} para ${formatTime(videoDuration)} de vídeo`;
+  }
+
+  document.querySelectorAll('input[name="subtitles"]').forEach((el) => {
+    el.addEventListener('change', updateEstimate);
+  });
+
+  // ---------- Miniatura do vídeo ----------
+  function extractYouTubeId(url) {
     try {
-      const resp = await fetch(`/api/probe?url=${encodeURIComponent(value)}`);
+      const u = new URL(url);
+      if (u.hostname === 'youtu.be') return u.pathname.slice(1);
+      const v = u.searchParams.get('v');
+      if (v) return v;
+      const m = u.pathname.match(/\/(embed|shorts)\/([^/?]+)/);
+      return m ? m[2] : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function loadThumbnailInto(imgEl, playEl, url) {
+    imgEl.hidden = true;
+    playEl.hidden = false;
+    const id = extractYouTubeId(url);
+    if (!id) return;
+    imgEl.onload = () => { imgEl.hidden = false; playEl.hidden = true; };
+    imgEl.onerror = () => { imgEl.hidden = true; playEl.hidden = false; };
+    imgEl.src = `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+  }
+
+  function loadThumbnail(url) {
+    loadThumbnailInto(videoThumbImg, videoThumbPlay, url);
+  }
+
+  function languageName(code) {
+    const l = LANGUAGES.find((x) => x.code === code);
+    return l ? l.name : code;
+  }
+
+  // ---------- Roteamento (client-side, sem reload) ----------
+  const NAV_STEP_LABELS = { configure: 'passo 2 de 2', processing: 'processando', result: 'concluído', error: 'não deu certo' };
+
+  function showScreen(name) {
+    screenHome.hidden = name !== 'home';
+    screenConfigure.hidden = name !== 'configure';
+    screenProcessing.hidden = name !== 'processing';
+    screenResult.hidden = name !== 'result';
+    screenError.hidden = name !== 'error';
+    navLinks.hidden = name !== 'home';
+    navStep.hidden = name === 'home';
+    navStep.textContent = NAV_STEP_LABELS[name] || '';
+  }
+
+  function navigateTo(path, { push = true } = {}) {
+    if (push) history.pushState({}, '', path);
+    routeTo(path);
+  }
+
+  function routeTo(path) {
+    const jobMatch = path.match(/^\/v\/([^/]+)$/);
+    if (jobMatch) {
+      enterJobRoute(jobMatch[1]);
+    } else if (path === '/configurar' && sourceUrl) {
+      showScreen('configure');
+    } else if (path === '/configurar') {
+      // Refresh direto em /configurar sem ter vindo da Tela 1 -- nao ha
+      // dados de video carregados em memoria pra mostrar, entao volta pro
+      // inicio em vez de exibir o formulario vazio.
+      navigateTo('/', { push: false });
+    } else {
+      showScreen('home');
+    }
+  }
+
+  window.addEventListener('popstate', () => {
+    stopJobWatch();
+    routeTo(location.pathname);
+  });
+
+  // ---------- Tela 1: processar link ----------
+  function isYouTubeUrl(value) {
+    try {
+      const u = new URL(value);
+      return YOUTUBE_HOSTS.has(u.hostname.toLowerCase());
+    } catch {
+      return false;
+    }
+  }
+
+  function showUrlError(message) {
+    urlError.hidden = false;
+    urlError.textContent = message;
+  }
+
+  urlInput.addEventListener('input', () => { urlError.hidden = true; });
+
+  processForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    processLink();
+  });
+
+  async function processLink() {
+    const raw = urlInput.value.trim();
+    if (!raw) {
+      showUrlError('Cole o link de um vídeo do YouTube');
+      return;
+    }
+    const normalized = raw.includes('://') ? raw : `https://${raw}`;
+    if (!isYouTubeUrl(normalized)) {
+      showUrlError('Esse link não é do YouTube');
+      return;
+    }
+    urlError.hidden = true;
+
+    processBtn.textContent = 'Processando…';
+    try {
+      const resp = await fetch(`/api/probe?url=${encodeURIComponent(normalized)}`);
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.detail || 'Não foi possível ler esse link.');
       }
       const data = await resp.json();
 
-      sourceUrl = value;
+      sourceUrl = normalized;
       videoDuration = data.duration || 0;
+      videoTitleEl.textContent = data.title || 'Vídeo';
+      videoDurationEl.textContent = videoDuration ? formatTime(videoDuration) : '—';
+      loadThumbnail(normalized);
+      updateEstimate();
+      sourceLangSelect.value = '';
+      targetLangSelect.value = '';
+      refreshLangSelects();
+      preselectTargetFromBrowser();
 
-      resetPanels();
-      introBlock.hidden = true;
-      featureChips.hidden = true;
-      sourceCard.hidden = false;
-      sourceTitleEl.textContent = data.title || 'Vídeo';
-      sourceMetaEl.textContent = videoDuration ? formatTime(videoDuration) : '';
-      submitBtn.hidden = false;
-      submitBtn.disabled = false;
+      resetConfigureErrors();
+      configureForm.hidden = false;
 
       if (videoDuration > 0) {
         trimSection.hidden = false;
@@ -746,18 +1028,28 @@
         trimSection.hidden = true;
         needsTrim = false;
       }
+
+      navigateTo('/configurar');
     } catch (e) {
-      urlError.hidden = false;
-      urlError.textContent = e.message;
+      showUrlError(e.message);
     } finally {
-      urlLoadBtn.disabled = false;
-      urlLoadBtn.textContent = 'Carregar';
+      processBtn.textContent = 'Processar';
     }
   }
 
-  changeSourceBtn.addEventListener('click', resetSelection);
+  changeLinkBtn.addEventListener('click', (e) => { e.preventDefault(); goHome(); });
+  backBtn.addEventListener('click', () => goHome());
 
-  function resetSelection() {
+  function goHome() {
+    discardActiveResult();
+    urlInput.value = sourceUrl;
+    urlError.hidden = true;
+    resetConfigureErrors();
+    configureForm.hidden = false;
+    navigateTo('/');
+  }
+
+  function resetHomeState() {
     discardActiveResult();
     urlInput.value = '';
     sourceUrl = '';
@@ -765,16 +1057,9 @@
     clipStart = 0;
     clipEnd = 0;
     needsTrim = false;
-    urlError.hidden = true;
-    resetPanels();
-    sourceCard.hidden = true;
-    trimSection.hidden = true;
-    submitBtn.hidden = false;
-    submitBtn.disabled = true;
-    introBlock.hidden = false;
-    featureChips.hidden = false;
   }
 
+  // ---------- Corte (trim) ----------
   function setClipRange(start, end) {
     if (!videoDuration) return;
     start = Math.max(0, start);
@@ -798,7 +1083,7 @@
     trimRangeLabel.textContent = `${formatTime(clipStart)} – ${formatTime(clipEnd)} (${formatTime(clipEnd - clipStart)})`;
   }
 
-  let dragMode = null; // null | 'left' | 'right' | 'move'
+  let dragMode = null;
   let dragStartX = 0;
   let dragStartClipStart = 0;
   let dragStartClipEnd = 0;
@@ -840,23 +1125,42 @@
     setClipRange(newStart, newStart + dur);
   });
 
-  submitBtn.addEventListener('click', startJob);
-  retryBtn.addEventListener('click', startJob);
+  // ---------- Gerar vídeo ----------
+  configureForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    startJob();
+  });
 
   async function startJob() {
     if (!sourceUrl) return;
 
-    resetPanels();
-    setControlsEnabled(false);
-    submitBtn.hidden = true;
+    const sourceLang = sourceLangSelect.value;
+    const targetLang = targetLangSelect.value;
+    if (!sourceLang) {
+      showFieldError(sourceLangSelect, sourceLangError, 'Escolha o idioma falado no vídeo');
+      return;
+    }
+    if (!targetLang) {
+      showFieldError(targetLangSelect, targetLangError, 'Escolha o idioma de destino');
+      return;
+    }
 
-    const payload = { url: sourceUrl };
+    submitErrorEl.hidden = true;
+    setControlsEnabled(false);
+
+    const payload = {
+      url: sourceUrl,
+      source_lang: sourceLang,
+      target_lang: targetLang,
+      include_subtitles: getSelected('subtitles') !== 'no',
+      video_title: videoTitleEl.textContent || '',
+      video_duration: videoDuration || 0,
+    };
     if (needsTrim) {
       payload.start = Number(clipStart.toFixed(2));
       payload.clip_duration = Number((clipEnd - clipStart).toFixed(2));
     }
 
-    let jobId;
     try {
       const resp = await fetch('/api/jobs', {
         method: 'POST',
@@ -868,144 +1172,300 @@
         throw new Error(err.detail || 'Falha ao iniciar o processamento.');
       }
       const data = await resp.json();
-      jobId = data.id;
+      navigateTo(`/v/${data.id}`);
     } catch (e) {
-      showError(e.message, lastStep);
+      submitErrorEl.hidden = false;
+      submitErrorEl.textContent = e.message;
       setControlsEnabled(true);
-      return;
     }
-
-    progressSection.hidden = false;
-    stepsCard.hidden = false;
-    lastStep = { label: '', pct: 0 };
-    updateStepsList(null);
-    const source = new EventSource(`/api/jobs/${jobId}/events`);
-
-    source.onmessage = async (ev) => {
-      const data = JSON.parse(ev.data);
-
-      if (data.done) {
-        source.close();
-        if (data.status === 'done') {
-          await showResult(jobId);
-        } else {
-          const status = await fetchStatus(jobId);
-          showError(status.message || 'Ocorreu um erro no processamento.', lastStep);
-          if (status.srt) {
-            errorSrtRow.hidden = false;
-            errorSrtName.textContent = status.srt;
-            errorSrtLink.href = `/api/download/${status.srt}`;
-            activeResultJobId = jobId;
-          }
-        }
-        setControlsEnabled(true);
-        return;
-      }
-
-      if (data.step !== 'error') {
-        lastStep = { label: data.label, pct: data.pct };
-        updateProgress(data.pct, data.label, data.message, data.step);
-      }
-    };
-
-    source.onerror = () => {
-      source.close();
-      showError('Conexão perdida com o servidor.', lastStep);
-      setControlsEnabled(true);
-    };
   }
 
-  function updateProgress(pct, step, message, stepId) {
-    progressPct.textContent = pct + '%';
-    progressMsg.textContent = message || '';
-
-    const idx = STEPS.findIndex((s) => s.id === stepId);
-    progressMeta.textContent = `Etapa ${idx >= 0 ? idx + 1 : 0} de ${STEPS.length}`;
-
-    const lit = Math.round((pct / 100) * WAVE_HEIGHTS.length);
-    Array.from(waveform.children).forEach((bar, i) => {
-      bar.style.height = WAVE_HEIGHTS[i] + '%';
-      bar.classList.toggle('lit', i < lit);
-      bar.classList.toggle('pulse', i === lit - 1 && pct < 100);
-    });
-
-    updateStepsList(stepId);
+  function resetConfigureErrors() {
+    sourceLangError.hidden = true;
+    targetLangError.hidden = true;
+    submitErrorEl.hidden = true;
   }
 
-  function updateStepsList(currentId) {
-    const idx = STEPS.findIndex((s) => s.id === currentId);
-    STEPS.forEach((s, i) => {
-      const row = document.getElementById('step-' + s.id);
-      row.classList.remove('is-done', 'is-active', 'is-pending');
-      if (currentId === 'done' || (idx >= 0 && i < idx)) {
-        row.classList.add('is-done');
-      } else if (i === idx) {
-        row.classList.add('is-active');
-      } else {
-        row.classList.add('is-pending');
-      }
-    });
+  function setControlsEnabled(enabled) {
+    submitBtn.disabled = !enabled;
+    submitBtn.textContent = enabled ? 'Gerar vídeo' : 'Gerando…';
+    backBtn.style.pointerEvents = enabled ? 'auto' : 'none';
+    configureForm.style.opacity = enabled ? '1' : '0.6';
   }
 
   async function fetchStatus(jobId) {
     const resp = await fetch(`/api/jobs/${jobId}`);
+    if (!resp.ok) return null;
     return resp.json();
   }
 
-  async function showResult(jobId) {
+  // ---------- Tela 3: processando ----------
+  function buildLangMeta(status) {
+    if (!status.source_lang || !status.target_lang) return '';
+    return `${languageName(status.source_lang)} para ${languageName(status.target_lang)}`;
+  }
+
+  async function enterJobRoute(jobId) {
+    stopJobWatch();
+    currentJobId = jobId;
     const status = await fetchStatus(jobId);
-    updateProgress(100, 'Concluído', 'Processamento concluído.', 'done');
-    progressSection.hidden = true;
-    stepsCard.hidden = true;
-    resultSection.hidden = false;
-
-    if (status.video) {
-      videoDownloadRow.hidden = false;
-      videoLink.href = `/api/download/${status.video}`;
-      videoFileName.textContent = status.video;
+    if (!status) {
+      showScreen('error');
+      enterErrorScreen('job_nao_encontrado', { id: jobId });
+      return;
     }
-    if (status.srt) {
-      srtDownloadRow.hidden = false;
-      srtLink.href = `/api/download/${status.srt}`;
-      srtFileName.textContent = status.srt;
-    }
-    if (status.video || status.srt) {
-      activeResultJobId = jobId;
+    if (status.status === 'done') {
+      enterResultScreen(status);
+    } else if (status.status === 'error') {
+      enterErrorScreen(status.error_code || 'falha_interna', status);
+    } else if (status.status === 'cancelled') {
+      enterErrorScreen('cancelado', status);
+    } else {
+      enterProcessingScreen(status);
     }
   }
 
-  function showError(message, step) {
-    progressSection.hidden = true;
-    stepsCard.hidden = true;
-    errorSection.hidden = false;
-    errorMsg.textContent = message;
-    errorMeta.textContent = step && step.label
-      ? `Falhou na etapa · ${step.label.toLowerCase()} · ${step.pct}%`
-      : 'Falhou no processamento';
+  function enterProcessingScreen(status) {
+    showScreen('processing');
+    procTitleEl.textContent = status.video_title || 'Vídeo';
+    const metaBits = [buildLangMeta(status), status.video_duration ? formatTime(status.video_duration) : ''].filter(Boolean);
+    procMetaEl.textContent = metaBits.join(' — ');
+    loadThumbnailInto(procThumbImg, procThumbPlay, status.source_url || '');
+    procNoteEl.textContent = 'Pode fechar a aba — o processamento continua e você pode voltar a este link depois.';
+    procEtaTotalMin = Math.max(1, Math.round(1 + (status.video_duration || 0) / 60 * 0.35));
+    wireCancelLink(status.id);
+    renderProcStage(status.step, status.pct, status.message);
+    watchJob(status.id);
   }
 
-  function resetPanels() {
-    progressSection.hidden = true;
-    stepsCard.hidden = true;
-    resultSection.hidden = true;
-    errorSection.hidden = true;
-    videoDownloadRow.hidden = true;
-    srtDownloadRow.hidden = true;
-    errorSrtRow.hidden = true;
-    updateProgress(0, '', '', null);
+  function renderProcStage(stepId, pct, message) {
+    const safePct = pct || 0;
+    procPctEl.textContent = safePct + '%';
+    const label = PROC_LABELS[stepId] || 'Preparando';
+    procNowEl.textContent = label;
+
+    const idx = PROC_STAGES.indexOf(label);
+    procRestEl.innerHTML = PROC_STAGES
+      .map((stage, i) => (stage === label ? null : `<span class="${idx >= 0 && i < idx ? 'd' : ''}">${stage}</span>`))
+      .filter(Boolean)
+      .join(' · ');
+
+    if (procAnnounceEl.dataset.last !== label) {
+      procAnnounceEl.textContent = label;
+      procAnnounceEl.dataset.last = label;
+    }
+
+    const remainMin = Math.max(0, Math.round(procEtaTotalMin * (100 - safePct) / 100));
+    procEtaLabelEl.textContent = remainMin <= 0
+      ? 'Menos de 1 minuto restante'
+      : `Cerca de ${remainMin} minuto${remainMin === 1 ? '' : 's'} restante${remainMin === 1 ? '' : 's'}`;
+
+    procLastUpdate = Date.now();
   }
 
-  function setControlsEnabled(enabled) {
-    submitBtn.disabled = !enabled || !sourceUrl;
-    submitBtn.textContent = enabled ? 'Traduzir e legendar' : 'Processando…';
-    urlInput.disabled = !enabled;
-    urlLoadBtn.disabled = !enabled;
-    changeSourceBtn.style.pointerEvents = enabled ? 'auto' : 'none';
-    trimSection.style.pointerEvents = enabled ? 'auto' : 'none';
-    trimSection.style.opacity = enabled ? '1' : '0.6';
+  function wireCancelLink(jobId) {
+    procCancelWrap.innerHTML = '<a href="#" class="link" id="proc-cancel-link">Cancelar</a>';
+    procCancelWrap.onclick = (e) => {
+      e.preventDefault();
+      const id = e.target && e.target.id;
+      if (id === 'proc-cancel-link') {
+        procCancelWrap.innerHTML = 'Cancelar mesmo? <a href="#" class="link" id="proc-cancel-yes">Sim</a> · <a href="#" class="link" id="proc-cancel-no">Não</a>';
+      } else if (id === 'proc-cancel-yes') {
+        procCancelWrap.innerHTML = 'Cancelando…';
+        procCancelWrap.onclick = null;
+        fetch(`/api/jobs/${jobId}/cancel`, { method: 'POST' }).catch(() => {});
+      } else if (id === 'proc-cancel-no') {
+        procCancelWrap.innerHTML = '<a href="#" class="link" id="proc-cancel-link">Cancelar</a>';
+      }
+    };
   }
 
-  resetBtn.addEventListener('click', resetSelection);
+  function watchJob(jobId) {
+    stopJobWatch();
+    procLastUpdate = Date.now();
+    jobEventSource = new EventSource(`/api/jobs/${jobId}/events`);
+
+    procStallTimer = setInterval(() => {
+      if (Date.now() - procLastUpdate > 45000) {
+        procNoteEl.textContent = 'Isso está demorando mais que o esperado, mas o processamento continua.';
+      }
+    }, 5000);
+
+    jobEventSource.onmessage = async (ev) => {
+      const data = JSON.parse(ev.data);
+      if (data.done) {
+        stopJobWatch();
+        const status = await fetchStatus(jobId);
+        if (!status) { enterErrorScreen('job_nao_encontrado', { id: jobId }); return; }
+        if (status.status === 'done') enterResultScreen(status);
+        else if (status.status === 'cancelled') enterErrorScreen('cancelado', status);
+        else enterErrorScreen(status.error_code || 'falha_interna', status);
+        return;
+      }
+      renderProcStage(data.step, data.pct, data.message);
+    };
+
+    jobEventSource.onerror = () => {
+      stopJobWatch();
+      // A conexao cai por instabilidade de rede, mas o job continua rodando
+      // no worker independente disso -- so avisamos e tentamos reconectar;
+      // se o usuario der refresh, enterJobRoute reconstroi o estado do zero.
+      procNoteEl.textContent = 'Conexão perdida — tentando reconectar…';
+      setTimeout(() => { if (currentJobId === jobId) watchJob(jobId); }, 4000);
+    };
+  }
+
+  function stopJobWatch() {
+    if (jobEventSource) { jobEventSource.close(); jobEventSource = null; }
+    if (procStallTimer) { clearInterval(procStallTimer); procStallTimer = null; }
+  }
+
+  // ---------- Tela 4: resultado ----------
+  function formatBytes(bytes) {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${bytes} B`;
+  }
+
+  async function setDlSize(el, url, label) {
+    el.textContent = label;
+    if (!url) return;
+    try {
+      const resp = await fetch(url, { method: 'HEAD' });
+      const len = resp.headers.get('content-length');
+      if (len) el.textContent = `${label} — ${formatBytes(Number(len))}`;
+    } catch { /* mantem so o rotulo se a checagem de tamanho falhar */ }
+  }
+
+  function enterResultScreen(status) {
+    stopJobWatch();
+    showScreen('result');
+    currentJobId = status.id;
+    activeResultJobId = status.id;
+
+    resultLeadEl.textContent = [buildLangMeta(status), status.include_subtitles ? 'com legenda' : 'só a voz'].filter(Boolean).join(' — ');
+    resultTitleEl.textContent = status.video_title || 'Vídeo';
+    resultMetaEl.textContent = [
+      status.video_duration ? formatTime(status.video_duration) : '',
+      (status.include_subtitles ? 'voz e legenda em ' : 'voz em ') + languageName(status.target_lang),
+    ].filter(Boolean).join(' — ');
+
+    resultPlayer.src = status.video_url || '';
+    if (status.include_subtitles && status.vtt_url) {
+      resultTrack.src = status.vtt_url;
+      resultTrack.default = true;
+    } else {
+      resultTrack.removeAttribute('src');
+    }
+
+    resultVideoCard.href = status.video_url || '#';
+    if (status.video_name) resultVideoCard.download = status.video_name;
+    setDlSize(resultVideoMetaEl, status.video_url, status.include_subtitles ? 'Vídeo dublado e legendado' : 'Vídeo dublado');
+
+    const showSrt = status.include_subtitles && !!status.srt_url;
+    resultSrtCard.hidden = !showSrt;
+    if (showSrt) {
+      resultSrtCard.href = status.srt_url;
+      if (status.srt_name) resultSrtCard.download = status.srt_name;
+      setDlSize(resultSrtMetaEl, status.srt_url, 'Legenda separada');
+    }
+
+    resultRetranslateLink.onclick = (e) => {
+      e.preventDefault();
+      urlInput.value = status.source_url || '';
+      processLink();
+    };
+  }
+
+  resultRestartBtn.addEventListener('click', () => {
+    resetHomeState();
+    navigateTo('/');
+  });
+
+  // ---------- Tela 5: erro ----------
+  function enterErrorScreen(code, status) {
+    stopJobWatch();
+    showScreen('error');
+    currentJobId = status.id || '';
+    const content = ERROR_CONTENT[code] || ERROR_CONTENT.falha_interna;
+
+    errorTitleEl.textContent = content.title;
+    errorBodyEl.textContent = content.body;
+    wireErrorAction(errorPrimaryBtn, content.primary, status);
+    if (content.secondary) {
+      errorSecondaryBtn.hidden = false;
+      wireErrorAction(errorSecondaryBtn, content.secondary, status);
+    } else {
+      errorSecondaryBtn.hidden = true;
+    }
+    setErrorFooter(status, code);
+    errorTitleEl.focus();
+  }
+
+  function wireErrorAction(btn, spec, status) {
+    btn.textContent = spec.label;
+    btn.onclick = () => {
+      if (spec.action === 'home') {
+        resetHomeState();
+        navigateTo('/');
+      } else if (spec.action === 'configurar') {
+        urlInput.value = status.source_url || '';
+        processLink();
+      } else if (spec.action === 'retry') {
+        retryJob(status);
+      }
+    };
+  }
+
+  async function retryJob(status) {
+    if (!status.source_url) { resetHomeState(); navigateTo('/'); return; }
+    const payload = {
+      url: status.source_url,
+      source_lang: status.source_lang || 'en',
+      target_lang: status.target_lang || 'pt',
+      include_subtitles: status.include_subtitles !== false,
+      video_title: status.video_title || '',
+      video_duration: status.video_duration || 0,
+    };
+    try {
+      const resp = await fetch('/api/jobs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      const data = await resp.json();
+      navigateTo(`/v/${data.id}`);
+    } catch { /* fica na tela de erro -- o operador pode tentar de novo */ }
+  }
+
+  function setErrorFooter(status, code) {
+    errorFooterEl.textContent = '';
+    if (status.source_url) {
+      const span = document.createElement('span');
+      span.textContent = status.source_url;
+      errorFooterEl.appendChild(span);
+    }
+    if (code === 'falha_interna' && status.id) {
+      const idSpan = document.createElement('div');
+      idSpan.textContent = `ID: ${status.id.slice(0, 8)}`;
+      errorFooterEl.appendChild(idSpan);
+    }
+    if (status.srt_url) {
+      activeResultJobId = status.id;
+      const a = document.createElement('a');
+      a.href = status.srt_url;
+      a.className = 'link';
+      a.textContent = 'Baixar legenda gerada até aqui';
+      a.style.display = 'block';
+      a.style.marginTop = '10px';
+      errorFooterEl.appendChild(a);
+    }
+  }
+
+  // ---------- Estado inicial ----------
+  async function boot() {
+    await loadLanguages();
+    routeTo(location.pathname);
+  }
+  boot();
 </script>
 </body>
 </html>

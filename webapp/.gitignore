@@ -4,3 +4,6 @@ __pycache__/
 *.log
 storage/outputs/*
 !storage/outputs/.gitkeep
+certs/*
+!certs/.gitkeep
+cookies.txt

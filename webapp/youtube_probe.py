@@ -5,6 +5,8 @@ que e quem de fato baixa/processa o video). Duplica a validacao de dominio
 usada pelo worker em engine/steps/download.py -- se a lista de hosts do
 YouTube mudar la, precisa mudar aqui tambem.
 """
+import os
+from pathlib import Path
 from urllib.parse import urlparse
 
 import yt_dlp
@@ -13,6 +15,15 @@ _YOUTUBE_HOSTS = {
     "youtube.com", "www.youtube.com", "m.youtube.com",
     "music.youtube.com", "youtu.be",
 }
+
+# Cookies opcionais (Netscape cookies.txt) de uma sessao logada no YouTube --
+# o YouTube as vezes exige confirmar "nao sou um robo" antes de servir
+# metadados/video, e sem uma sessao logada nao ha como passar por isso.
+# Nunca commitado (ver .gitignore); copia propria do worker, que tem a sua
+# em engine/steps/download.py (nao compartilhado, mesma logica duplicada de
+# proposito -- ver cabecalho de queue_client.py sobre esse padrao no projeto).
+BASE_DIR = Path(__file__).resolve().parent
+COOKIES_FILE = Path(os.environ.get("YOUTUBE_COOKIES_FILE") or (BASE_DIR / "cookies.txt"))
 
 
 def _validate_url(url: str) -> None:
@@ -27,6 +38,8 @@ def probe(url: str) -> dict:
     """Consulta duracao/titulo do video sem baixar (usado para montar a barra de corte)."""
     _validate_url(url)
     opts = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True}
+    if COOKIES_FILE.exists():
+        opts["cookiefile"] = str(COOKIES_FILE)
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)

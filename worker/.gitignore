@@ -6,3 +6,6 @@ storage/outputs/*
 storage/work/*
 !storage/outputs/.gitkeep
 !storage/work/.gitkeep
+certs/*
+!certs/.gitkeep
+cookies.txt

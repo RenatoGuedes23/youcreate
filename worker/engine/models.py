@@ -15,5 +15,6 @@ class Segment:
 class PipelineResult:
     segments: list[Segment] = field(default_factory=list)
     srt_path: Path | None = None       # legenda PT-BR
+    vtt_path: Path | None = None       # mesma legenda em WebVTT (faixa <track> do player)
     dub_audio_path: Path | None = None # trilha dublada
     video_out: Path | None = None      # mp4 final (legenda + dublagem)

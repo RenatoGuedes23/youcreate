@@ -62,6 +62,26 @@ docker compose logs -f worker    # logs do worker (todas as réplicas)
 docker compose down              # para tudo
 ```
 
+### `docker compose up --build` falhando com `CERTIFICATE_VERIFY_FAILED`?
+
+Se sua máquina estiver atrás de um proxy corporativo que inspeciona HTTPS
+(Zscaler, Netskope, antivírus de empresa, etc.), o `pip install` dentro do
+build vai falhar com esse erro — mesmo a máquina tendo internet normal,
+porque o certificado desse proxy não é reconhecido dentro do container.
+
+Solução: extraia o certificado confiável da sua máquina e coloque em
+`webapp/certs/` e `worker/certs/` (pastas ignoradas pelo git, cada uma já
+tem um `.gitkeep`):
+
+```bash
+cp /etc/ssl/certs/ca-certificates.crt webapp/certs/host-ca-bundle.crt
+cp /etc/ssl/certs/ca-certificates.crt worker/certs/host-ca-bundle.crt
+docker compose up -d --build
+```
+
+Isso não afeta quem builda numa rede sem esse tipo de proxy (a VM na nuvem,
+por exemplo) — a pasta fica vazia e o build segue normal.
+
 ## Rodando sem Docker (desenvolvimento local)
 
 Precisa de **Python 3.11+**, **ffmpeg** no PATH, e um **Redis** rodando

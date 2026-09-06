@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 
 import yt_dlp
 
+from engine import config
+
 _YOUTUBE_HOSTS = {
     "youtube.com", "www.youtube.com", "m.youtube.com",
     "music.youtube.com", "youtu.be",
@@ -24,10 +26,17 @@ def _validate_url(url: str) -> None:
         raise RuntimeError("Apenas links do YouTube sao aceitos.")
 
 
+def _cookie_opts() -> dict:
+    """Cookies opcionais de uma sessao logada -- usadas quando o YouTube exige
+    confirmar "nao sou um robo" antes de servir video/metadados."""
+    path = Path(config.YOUTUBE_COOKIES_FILE)
+    return {"cookiefile": str(path)} if path.exists() else {}
+
+
 def probe(url: str) -> dict:
     """Consulta duracao/titulo do video sem baixar (usado para montar a barra de corte)."""
     _validate_url(url)
-    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True}
+    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True, **_cookie_opts()}
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -59,6 +68,7 @@ def download_video(
         "format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best",
         "merge_output_format": "mp4",
         "outtmpl": out_template,
+        **_cookie_opts(),
     }
 
     if duration:

@@ -14,8 +14,12 @@ WORK_DIR = Path(os.environ.get("WORK_DIR", STORAGE_DIR / "work"))
 for _dir in (OUTPUTS_DIR, WORK_DIR):
     _dir.mkdir(parents=True, exist_ok=True)
 
-SOURCE_LANG = os.environ.get("SOURCE_LANG", "en")
 TARGET_LANG = os.environ.get("TARGET_LANG", "pt")
+
+# Cookies opcionais (Netscape cookies.txt) de uma sessao logada no YouTube --
+# usadas quando o YouTube exige confirmar "nao sou um robo" antes de servir
+# video/metadados. Nunca commitado (ver .gitignore).
+YOUTUBE_COOKIES_FILE = os.environ.get("YOUTUBE_COOKIES_FILE") or str(BASE_DIR / "cookies.txt")
 
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "auto")

@@ -20,12 +20,16 @@ def _get_model() -> WhisperModel:
     return _model
 
 
-def transcribe(audio_path: Path) -> list[Segment]:
-    """Transcreve audio_path e devolve segmentos com timestamps (idioma origem)."""
+def transcribe(audio_path: Path, language: str | None = None) -> list[Segment]:
+    """Transcreve audio_path e devolve segmentos com timestamps (idioma origem).
+
+    language segue o codigo ISO 639-1 esperado pelo Whisper (ex: "en", "pt").
+    None deixa o Whisper autodetectar o idioma falado.
+    """
     model = _get_model()
     segments_iter, _info = model.transcribe(
         str(audio_path),
-        language=config.SOURCE_LANG,
+        language=language,
         vad_filter=True,
     )
     segments = [
@@ -35,6 +39,6 @@ def transcribe(audio_path: Path) -> list[Segment]:
     if not segments:
         raise RuntimeError(
             "Nenhuma fala detectada no audio. Verifique se o video contem voz "
-            "audivel no idioma configurado em SOURCE_LANG."
+            "audivel no idioma selecionado."
         )
     return segments

@@ -3,18 +3,24 @@ status/progresso/downloads. Nunca processa video -- isso e trabalho do
 worker, um servico totalmente separado. Os dois so se falam via Redis
 (queue_client.py) -- nao ha nenhum arquivo compartilhado entre eles.
 """
+import hashlib
+import hmac
 import json
 import logging
 import os
+import secrets
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 import queue_client
+from languages import languages_payload
 from logging_setup import setup_logging
-from schemas import JobCreated, JobCreateRequest, JobStatus, ProbeResult
+from schemas import JobCreated, JobCreateRequest, JobStatus, LanguageOption, ProbeResult
 from youtube_probe import probe as probe_source
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -27,16 +33,53 @@ OUTPUTS_DIR.mkdir(parents=True, exist_ok=True)
 setup_logging(STORAGE_DIR / "youcreate-web.log")
 logger = logging.getLogger(__name__)
 
+# Assina os links de download (Tela 4) para que nao fiquem validos pra sempre
+# nem previsiveis so pelo nome do arquivo. Sem contas/sessao no projeto, entao
+# nao ha "dono" do link pra checar -- so validade curta + assinatura. Sem
+# DOWNLOAD_SIGN_SECRET no .env, gera uma por processo (perfeitamente aceitavel
+# aqui: so invalida links antigos apos um restart do container, nao ha nada
+# sensivel sendo protegido de fato, e o arquivo em si some quando a pagina de
+# resultado e fechada de qualquer forma).
+DOWNLOAD_SIGN_SECRET = os.environ.get("DOWNLOAD_SIGN_SECRET") or secrets.token_hex(32)
+DOWNLOAD_URL_TTL_SECONDS = 60 * 60
+
 app = FastAPI(title="youcreate")
+app.mount("/assets", StaticFiles(directory=BASE_DIR / "web" / "assets"), name="assets")
 
 _INDEX_PATH = BASE_DIR / "web" / "index.html"
 
 
+def _sign(filename: str, exp: int) -> str:
+    msg = f"{filename}:{exp}".encode()
+    return hmac.new(DOWNLOAD_SIGN_SECRET.encode(), msg, hashlib.sha256).hexdigest()
+
+
+def _download_url(filename: str) -> str:
+    if not filename:
+        return ""
+    exp = int(time.time()) + DOWNLOAD_URL_TTL_SECONDS
+    sig = _sign(filename, exp)
+    return f"/api/download/{filename}?exp={exp}&sig={sig}"
+
+
 @app.get("/")
-def index() -> HTMLResponse:
+@app.get("/configurar")
+@app.get("/v/{job_id}")
+def index(job_id: str = "") -> HTMLResponse:
+    """Serve o mesmo SPA pras tres telas ('/', '/configurar' e '/v/<id>') --
+    a troca entre elas e so roteamento client-side (history.pushState), sem
+    reload de pagina. Servir o mesmo arquivo nas tres rotas evita 404 se o
+    usuario der refresh direto numa delas."""
     if not _INDEX_PATH.exists():
         raise HTTPException(status_code=404, detail="web/index.html ainda nao existe.")
     return HTMLResponse(_INDEX_PATH.read_text(encoding="utf-8"))
+
+
+@app.get("/api/languages", response_model=list[LanguageOption])
+def languages() -> list[LanguageOption]:
+    """Idiomas suportados -- fonte unica para a faixa da Tela 1 e os
+    seletores da Tela 2 (ver languages.py)."""
+    return [LanguageOption(**lang) for lang in languages_payload()]
 
 
 @app.get("/api/probe", response_model=ProbeResult)
@@ -56,6 +99,11 @@ def create_job(payload: JobCreateRequest) -> JobCreated:
         source_url=payload.url,
         url_clip_start=payload.start,
         url_clip_duration=payload.clip_duration,
+        source_lang=payload.source_lang,
+        target_lang=payload.target_lang,
+        include_subtitles=payload.include_subtitles,
+        video_title=payload.video_title,
+        video_duration=payload.video_duration,
     )
     logger.info("Job %s criado e enfileirado para %s", job_id, payload.url)
     return JobCreated(id=job_id)
@@ -72,9 +120,32 @@ def get_job(job_id: str) -> JobStatus:
         pct=job.pct,
         step=job.step,
         message=job.message,
-        video=job.result_video,
-        srt=job.result_srt,
+        error_code=job.error_code,
+        created_at=job.created_at,
+        source_url=job.source_url,
+        source_lang=job.source_lang,
+        video_title=job.video_title,
+        video_duration=job.video_duration,
+        target_lang=job.target_lang,
+        include_subtitles=job.include_subtitles,
+        video_name=job.result_video,
+        srt_name=job.result_srt,
+        video_url=_download_url(job.result_video),
+        srt_url=_download_url(job.result_srt),
+        vtt_url=_download_url(job.result_vtt),
     )
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+def cancel_job(job_id: str) -> dict:
+    """Pede pro worker cancelar o job na proxima checagem entre etapas (ver
+    PipelineCancelled em engine/pipeline.py) -- nao interrompe uma etapa em
+    andamento, so evita comecar a proxima."""
+    ok = queue_client.request_cancel(job_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Job nao encontrado.")
+    logger.info("Job %s: cancelamento solicitado", job_id)
+    return {"ok": True}
 
 
 @app.get("/api/jobs/{job_id}/events")
@@ -90,7 +161,7 @@ def job_events(job_id: str) -> StreamingResponse:
             # (ex: worker rapido, ou reconexao do cliente) -- confere o estado
             # atual primeiro para nao esperar por um evento que nunca vira.
             current = queue_client.get_job(job_id)
-            if current and current.status in ("done", "error"):
+            if current and current.status in ("done", "error", "cancelled"):
                 yield f"data: {json.dumps({'done': True, 'status': current.status})}\n\n"
                 return
 
@@ -101,7 +172,7 @@ def job_events(job_id: str) -> StreamingResponse:
                     # de seguranca (cobre perder a mensagem final publicada
                     # entre nosso get_job() acima e a inscricao no canal).
                     current = queue_client.get_job(job_id)
-                    if current and current.status in ("done", "error"):
+                    if current and current.status in ("done", "error", "cancelled"):
                         yield f"data: {json.dumps({'done': True, 'status': current.status})}\n\n"
                         return
                     continue
@@ -116,8 +187,12 @@ def job_events(job_id: str) -> StreamingResponse:
 
 
 @app.get("/api/download/{filename}")
-def download(filename: str) -> FileResponse:
+def download(filename: str, exp: int, sig: str) -> FileResponse:
     safe_name = Path(filename).name
+    if time.time() > exp:
+        raise HTTPException(status_code=403, detail="Link expirado.")
+    if not hmac.compare_digest(_sign(safe_name, exp), sig):
+        raise HTTPException(status_code=403, detail="Link invalido.")
     path = OUTPUTS_DIR / safe_name
     if not path.exists():
         raise HTTPException(status_code=404, detail="Arquivo nao encontrado.")
@@ -138,7 +213,7 @@ def discard_job(job_id: str) -> dict:
         return {"ok": True}
 
     removed = []
-    for name in (job.result_video, job.result_srt):
+    for name in (job.result_video, job.result_srt, job.result_vtt):
         if not name:
             continue
         path = OUTPUTS_DIR / Path(name).name

@@ -13,7 +13,7 @@ import shutil
 
 from engine import config
 from engine.ffmpeg_utils import is_ffmpeg_available
-from engine.pipeline import PipelineError
+from engine.pipeline import PipelineCancelled, PipelineError
 from engine.pipeline import run as run_pipeline
 from logging_setup import setup_logging
 
@@ -21,6 +21,26 @@ import queue_client
 
 setup_logging(config.STORAGE_DIR / "youcreate-worker.log")
 logger = logging.getLogger(__name__)
+
+
+def _classify_error(message: str) -> str:
+    """Mapeia heuristicamente a mensagem de erro (yt-dlp ou interna) para um
+    codigo curto que a Tela 5 do site usa pra escolher titulo/texto/acoes.
+    Best-effort por string matching -- nao ha API estruturada de erros do
+    yt-dlp -- entao isto deve ser revisto/ampliado conforme novos casos
+    reais aparecerem nos logs. video_longo nao e verificado aqui (nao ha
+    limite de duracao no motor); o codigo existe so para a Tela 5 poder
+    exibi-lo quando/se um limite desses for adicionado no futuro."""
+    text = message.lower()
+    if "private video" in text or "sign in if you" in text:
+        return "video_privado"
+    if "video unavailable" in text or "has been removed" in text or "no longer available" in text:
+        return "video_indisponivel"
+    if "not made this video available in your country" in text or "blocked it in your country" in text:
+        return "restrito_regiao"
+    if "does not contain any stream" in text or "no audio" in text or "audio stream not found" in text:
+        return "sem_audio"
+    return "falha_interna"
 
 
 def _process(job_id: str) -> None:
@@ -44,22 +64,34 @@ def _process(job_id: str) -> None:
             source_url=job.source_url,
             url_clip_start=job.url_clip_start,
             url_clip_duration=job.url_clip_duration,
+            source_lang=job.source_lang or None,
+            make_subs=job.include_subtitles,
+            make_dub=True,
+            should_cancel=lambda: queue_client.is_cancelled(job_id),
         )
         queue_client.update_job(
             job_id,
             status="done",
             result_video=result.video_out.name if result.video_out else "",
             result_srt=result.srt_path.name if result.srt_path else "",
+            result_vtt=result.vtt_path.name if result.vtt_path else "",
         )
         queue_client.publish_event(job_id, {"done": True, "status": "done"})
         logger.info("Job %s concluido", job_id)
+    except PipelineCancelled:
+        queue_client.update_job(job_id, status="cancelled", message="Cancelado.")
+        queue_client.publish_event(job_id, {"done": True, "status": "cancelled"})
+        logger.info("Job %s cancelado pelo operador", job_id)
     except PipelineError as exc:
         result_srt = exc.partial_result.srt_path.name if exc.partial_result.srt_path else ""
-        queue_client.update_job(job_id, status="error", message=str(exc), result_srt=result_srt)
+        error_code = _classify_error(str(exc))
+        queue_client.update_job(
+            job_id, status="error", message=str(exc), result_srt=result_srt, error_code=error_code,
+        )
         queue_client.publish_event(job_id, {"done": True, "status": "error"})
-        logger.error("Job %s falhou: %s", job_id, exc)
+        logger.error("Job %s falhou (%s): %s", job_id, error_code, exc)
     except Exception as exc:
-        queue_client.update_job(job_id, status="error", message=str(exc))
+        queue_client.update_job(job_id, status="error", message=str(exc), error_code="falha_interna")
         queue_client.publish_event(job_id, {"done": True, "status": "error"})
         logger.exception("Job %s falhou de forma inesperada", job_id)
     finally:

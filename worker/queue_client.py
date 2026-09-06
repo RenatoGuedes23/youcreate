@@ -42,14 +42,23 @@ def _channel(job_id: str) -> str:
 class JobRecord:
     id: str
     source_url: str
+    created_at: float = 0.0
     url_clip_start: float = 0.0
     url_clip_duration: float | None = None
-    status: str = "queued"   # queued|running|done|error
+    source_lang: str = ""
+    target_lang: str = ""
+    include_subtitles: bool = True
+    video_title: str = ""
+    video_duration: float = 0.0
+    status: str = "queued"   # queued|running|done|error|cancelled
     pct: int = 0
     step: str = ""
     message: str = ""
+    error_code: str = ""
+    cancel_requested: bool = False
     result_video: str = ""
     result_srt: str = ""
+    result_vtt: str = ""
 
 
 def get_job(job_id: str) -> JobRecord | None:
@@ -59,15 +68,30 @@ def get_job(job_id: str) -> JobRecord | None:
     return JobRecord(
         id=data["id"],
         source_url=data["source_url"],
+        created_at=float(data.get("created_at") or 0.0),
         url_clip_start=float(data.get("url_clip_start") or 0.0),
         url_clip_duration=float(data["url_clip_duration"]) if data.get("url_clip_duration") else None,
+        source_lang=data.get("source_lang", ""),
+        target_lang=data.get("target_lang", ""),
+        include_subtitles=data.get("include_subtitles", "1") == "1",
+        video_title=data.get("video_title", ""),
+        video_duration=float(data.get("video_duration") or 0.0),
         status=data.get("status", "queued"),
         pct=int(data.get("pct") or 0),
         step=data.get("step", ""),
         message=data.get("message", ""),
+        error_code=data.get("error_code", ""),
+        cancel_requested=data.get("cancel_requested") == "1",
         result_video=data.get("result_video", ""),
         result_srt=data.get("result_srt", ""),
+        result_vtt=data.get("result_vtt", ""),
     )
+
+
+def is_cancelled(job_id: str) -> bool:
+    """Le direto do Redis (sem cache) se o site marcou o job para cancelamento.
+    Chamado pelo pipeline entre etapas -- ver PipelineCancelled."""
+    return _redis().hget(_job_key(job_id), "cancel_requested") == "1"
 
 
 def update_job(job_id: str, **fields) -> None:
