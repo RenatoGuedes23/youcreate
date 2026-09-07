@@ -36,7 +36,7 @@ class PipelineCancelled(RuntimeError):
     """Levantada quando should_cancel() diz sim entre duas etapas.
 
     So cancela ENTRE etapas (nunca no meio de uma chamada de ffmpeg/Whisper/
-    Gemini/Polly em andamento) -- e uma escolha deliberada de simplicidade:
+    tradutor/Polly em andamento) -- e uma escolha deliberada de simplicidade:
     interromper um subprocesso de ffmpeg ou uma chamada de API a meio caminho
     exigiria infraestrutura de cancelamento bem mais complexa.
     """

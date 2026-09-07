@@ -40,7 +40,7 @@ prática isso significa:
   redis, yt-dlp, pydantic); o `worker` carrega as libs pesadas
   (faster-whisper, google-genai, boto3) e é o único que precisa do ffmpeg
   instalado no sistema.
-- Cada um tem seu próprio `.env`/`.env.example` — segredos (Gemini, AWS)
+- Cada um tem seu próprio `.env`/`.env.example` — segredos (AWS, OpenRouter)
   ficam só em `worker/.env`, já que o `webapp` nunca precisa deles.
 - O protocolo de comunicação (chaves e formato de dados no Redis) é
   implementado **duas vezes**, uma em cada serviço:
@@ -176,21 +176,43 @@ global (`_model`), evitando recarregar do disco a cada chamada.
 trechos de silêncio em vez de "alucinar" texto neles. Resultado: uma lista
 de `Segment` com timestamps e texto em inglês.
 
-### `engine/providers/translate_gemini.py` — `translate_batch()`
+### Tradução — dois providers, dois jeitos bem diferentes de resolver o mesmo problema
 
-O ponto mais interessante da tradução: em vez de chamar o Gemini uma vez por
-frase, monta **um prompt único** com todas as falas numeradas
-(`"0: Hello there\n1: How are you..."`) e pede para o modelo devolver um
-**array JSON na mesma ordem**, forçado via `response_schema=list[str]`. Isso
-garante que a tradução do índice 47 corresponde exatamente à fala 47, sem
-risco de desalinhamento, e custa uma única chamada de API por vídeo,
-independente de quantas falas existam.
+`engine/steps/translate.py` é o encaixe comum: extrai os textos dos
+`Segment`, chama `translate_batch(texts) -> list[str]` do provider
+ativo (`config.TRANSLATE_PROVIDER`: `"aws"` ou `"openrouter"`), escreve o
+resultado de volta em `seg.translation`. Trocar de provider é implementar
+a mesma interface (`translate_base.py`) e adicionar um `if` na fábrica.
 
-`engine/steps/translate.py` é o encaixe: extrai os textos dos `Segment`,
-chama `translate_batch()`, escreve o resultado de volta em
-`seg.translation`. A seleção de provider olha `config.TRANSLATE_PROVIDER`
-(hoje só `"gemini"`) — trocar por outro é implementar a mesma interface
-(`translate_base.py`) e adicionar um `if` na fábrica.
+O Gemini foi o primeiro provider implementado aqui e depois **removido por
+completo** — ver "O Gemini esgotou a cota e foi removido" mais abaixo para
+o porquê. A ideia dele (um prompt único com todas as falas numeradas,
+pedindo de volta um array JSON na mesma ordem, custando uma única chamada
+de API por vídeo) só funciona de verdade com um provider que seja um LLM
+de propósito geral seguindo instruções — por isso hoje ela sobrevive em
+`translate_openrouter.py`, não em `translate_aws.py`:
+
+- **`engine/providers/translate_aws.py`** (`AmazonTranslate`, provider
+  padrão hoje) — o Amazon Translate **não é um LLM**, é um serviço de
+  tradução literal cuja API só aceita **um texto por chamada**. Não existe
+  "traduza esta lista preservando a ordem" numa chamada só. `translate_batch`
+  vira um loop chamando `translate_text` uma vez por fala, em sequência (não
+  em paralelo, para não estourar o limite de transações por segundo da
+  conta), com retry em `TooManyRequestsException`. Reaproveita as mesmas
+  credenciais AWS já exigidas para o Polly — nenhum segredo novo. Trade-off
+  visto na prática: tradução sem contexto (`"long trunks"` virou `"baús
+  longos"` em vez de `"trombas compridas"`), e `TRANSLATE_STYLE` (controle
+  de tom via prompt) simplesmente não se aplica a esse provider.
+- **`engine/providers/translate_openrouter.py`** (`OpenRouterTranslator`)
+  — ponte genérica para qualquer modelo por trás do gateway OpenRouter
+  (endpoint `/chat/completions`, compatível com o formato da OpenAI). O
+  modelo de fato usado é so uma string de configuração
+  (`OPENROUTER_MODEL`, ex: `"deepseek/deepseek-chat"`) — trocar de modelo
+  não pede nenhuma mudança de código. Mantém o mesmo prompt em lote
+  numerado de antes, mas pede um **objeto** JSON (`{"translations":
+  [...]}`) em vez de um array solto na raiz, porque `response_format:
+  json_object` — o jeito mais amplamente suportado entre modelos variados
+  de pedir JSON estruturado — geralmente exige um objeto no topo.
 
 ### `engine/steps/subtitle.py` — `build_srt()` e `build_vtt()`
 
@@ -273,7 +295,7 @@ cada etapa (nunca durante); se `should_cancel()` disser sim, levanta
 `PipelineCancelled(partial_result)` e para ali.
 
 Isso significa que cancelar não interrompe um `ffmpeg`, uma chamada ao
-Whisper, ao Gemini ou à Polly já em andamento — só evita que a **próxima**
+Whisper, ao tradutor ativo ou à Polly já em andamento — só evita que a **próxima**
 etapa comece. Foi uma escolha consciente: matar um subprocesso de ffmpeg ou
 uma chamada de API a meio caminho exigiria uma camada de cancelamento bem
 mais complexa (subprocessos com `SIGTERM`, streams parciais, etc.) para um
@@ -400,6 +422,39 @@ cookie desse arquivo deve ser tratado como comprometido assim que o
 commit for público, e a sessão correspondente revogada em
 `myaccount.google.com/security` se algum dia a conta usada para gerar o
 arquivo precisar ser considerada sensível de novo.
+
+## O Gemini esgotou a cota e foi removido
+
+Rodando jobs reais contra a API do Gemini, apareceu um `429
+RESOURCE_EXHAUSTED`:
+
+```
+Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests
+limit: 20, model: gemini-3.6-flash
+```
+
+O tier gratuito do Gemini limita a **20 requisições por dia por modelo**.
+Como `translate_segments` faz exatamente **uma** chamada ao Gemini por
+vídeo (todo o texto num prompt só, ver seção de tradução acima), isso
+virava um teto de ~20 vídeos processados por dia, batido rapidinho durante
+os próprios testes de desenvolvimento — sem nenhuma degradação graciosa,
+só erro duro.
+
+Antes de decidir remover, ainda foi adicionado um retry com backoff (3
+tentativas, 2s/5s/10s) para o caso mais comum de **503 "high demand"**
+(sobrecarga temporária do modelo, coisa diferente do 429 de cota) — esse
+retry funcionou bem, mas não ajuda em nada contra 429 (cota diária
+esgotada não volta em segundos). A decisão final foi **remover o Gemini
+por completo** (não deixar behind uma flag) e substituir por dois
+providers sem esse tipo de teto baixo — ver "Tradução — dois providers"
+mais acima para o que entrou no lugar (`translate_aws.py` como padrão,
+`translate_openrouter.py` como alternativa configurável por modelo).
+
+Lição que ficou para qualquer provider futuro neste projeto: **antes de
+adotar um serviço com free tier, checar explicitamente os limites de
+cota/rate documentados** — um 429 de cota esgotada é um problema
+estrutural (só se resolve trocando de provider, pagando, ou esperando o
+reset), bem diferente de um 503 transitório (aí sim vale um retry).
 
 ## O incidente de segurança (Amazon Polly)
 

@@ -135,19 +135,14 @@ cd worker && python cli.py "https://www.youtube.com/watch?v=..." --start 30 --du
 
 ## Obtendo as chaves (`worker/.env`)
 
-### `GEMINI_API_KEY` (tradução)
+### Credenciais da AWS (tradução — Amazon Translate — e dublagem — Amazon Polly)
 
-1. Acesse https://aistudio.google.com
-2. Faça login com uma conta Google
-3. Vá em "Get API key" e gere uma chave
-4. Cole em `GEMINI_API_KEY=` no `worker/.env`
+Provider padrão de tradução (`TRANSLATE_PROVIDER=aws`) e único provider de
+dublagem — as mesmas credenciais servem para os dois.
 
-O tier gratuito do Gemini é suficiente para uso pessoal.
-
-### Credenciais da AWS (dublagem — Amazon Polly)
-
-1. Crie (ou use) um usuário IAM com a permissão `polly:SynthesizeSpeech`, e
-   gere um Access Key ID + Secret Access Key para ele
+1. Crie (ou use) um usuário IAM com as permissões `translate:TranslateText`
+   e `polly:SynthesizeSpeech`, e gere um Access Key ID + Secret Access Key
+   para ele
 2. No `worker/.env`, defina:
    ```
    AWS_ACCESS_KEY_ID=...
@@ -165,8 +160,28 @@ só as chaves definidas explicitamente no `.env`. Isso evita usar por engano
 uma conta AWS de outro projeto/empresa que porventura já esteja configurada
 na mesma máquina.
 
-Sem essas credenciais, a legenda ainda funciona normalmente — só a dublagem
-depende delas.
+Sem essas credenciais, nem a tradução (no provider padrão) nem a dublagem
+funcionam — são obrigatórias, ao contrário do que valia quando a tradução
+era via Gemini.
+
+### `OPENROUTER_API_KEY` (tradução — opcional, provider alternativo)
+
+Só necessário se `TRANSLATE_PROVIDER=openrouter` no `worker/.env` — troca
+o Amazon Translate (tradução literal, sem contas de uso diário travando)
+por qualquer LLM disponível no [OpenRouter](https://openrouter.ai), útil
+pra recuperar o controle de tom/estilo que o Amazon Translate não tem.
+
+1. Crie uma conta em https://openrouter.ai e gere uma chave em
+   https://openrouter.ai/keys
+2. Cole em `OPENROUTER_API_KEY=` no `worker/.env`
+3. Defina `OPENROUTER_MODEL=` com o modelo desejado (formato
+   `provider/modelo`, ex: `deepseek/deepseek-chat`) — ver
+   https://openrouter.ai/models para a lista completa e preços por token.
+
+(O Gemini foi usado no início do projeto, mas foi **removido**: o tier
+gratuito trava em 20 requisições/dia por modelo, o que virava um teto de
+~20 vídeos processados por dia — ver `docs/ARQUITETURA.md` para os
+detalhes. Não precisa mais de `GEMINI_API_KEY`.)
 
 As demais variáveis do `worker/.env.example` já vêm com defaults sensatos
 (`SOURCE_LANG`, `WHISPER_MODEL`, `DUB_VOICE`, `BURN_SUBS`, etc.) — ajuste

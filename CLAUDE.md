@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 All 5 original build phases (see "Build phases" below) are implemented and validated end-to-end with real dubbing (Amazon Polly), including the video-trim feature (§ Frontend) and friendly error handling / logging (§ Quality bar). The original architecture spec (`docs/youclone-arquitetura.md`, in Portuguese) is kept as historical reference; this file is the up-to-date source of truth. See `docs/ARQUITETURA.md` (design/why) and `docs/FLUXO.md` (request trace/how) for the current, detailed documentation. Google Cloud TTS was implemented earlier and then **removed** by explicit operator decision (2026-09) in favor of Polly alone — do not re-add it unless asked.
 
+**Gemini was implemented as the translation provider, then removed entirely (2026-09).** It worked, but the free tier hit a hard wall: `generativelanguage.googleapis.com/generate_content_free_tier_requests` caps at **20 requests/day per model** — since `translate_segments` makes exactly one Gemini call per video, that's a ceiling of ~20 videos/day regardless of length, with no graceful degradation (`429 RESOURCE_EXHAUSTED`). Paying to lift that cap was not the direction chosen; instead `translate_gemini.py` and `google-genai` were deleted outright (not kept behind a flag) and replaced with two new providers, both still behind the same `Translator` protocol so the pipeline/orchestrator didn't need to change:
+- **`translate_aws.py`** (`TRANSLATE_PROVIDER=aws`, current default) — Amazon Translate. One `translate_text` call per subtitle segment (the API has no "translate this list, preserve order" batch mode like Gemini's prompt-based approach), sequential to respect the account's TPS limit, with retry-with-backoff on `TooManyRequestsException`. Reuses the AWS credentials already required for Polly — no new secret needed. Trade-off found in practice: literal/context-blind translation (e.g. "long trunks" → "baús longos" instead of "trombas compridas") — no prompt-based tone control (`TRANSLATE_STYLE` doesn't apply to this provider).
+- **`translate_openrouter.py`** (`TRANSLATE_PROVIDER=openrouter`) — a generic bridge to OpenRouter's OpenAI-compatible `/chat/completions` endpoint, so any model OpenRouter carries (Gemini included, ironically, just without the free-tier trap) can be swapped in purely via the `OPENROUTER_MODEL` env var (e.g. `deepseek/deepseek-chat`, `google/gemini-3.8-flash`) — no code change to switch models. Keeps the same single-call, numbered-batch prompt style as the old Gemini provider, but asks for a JSON **object** (`{"translations": [...]}`) rather than a bare array, since `response_format: json_object` — the most broadly supported way to request structured JSON across different models — generally requires an object at the top level. Retries on 429/5xx the same way the AWS provider does.
+
+Both new providers also picked up a lesson from the Gemini incident: retry-with-backoff on the specific transient/rate-limit error codes each API actually returns (`ClientError`/`ServerError` codes for boto3, HTTP status for OpenRouter) — not a blanket retry-everything, since a 4xx like a bad API key or a malformed prompt won't succeed on a second attempt.
+
 **Frontend redesigned as 5 client-routed screens (2026-09).** The original single-panel frontend (URL input + inline progress/result/error all inside one form) was replaced by a 5-screen SPA per a detailed operator-supplied visual spec: Tela 1 (`/`, paste link), Tela 2 (`/configurar`, language/subtitle/trim options), Tela 3 (`/v/<id>`, processing), Tela 4 (`/v/<id>` done, result/player/downloads), Tela 5 (`/v/<id>` failed/cancelled, generic error component). This came with real backend support that didn't exist before: job cancellation (`PipelineCancelled`, checked only between pipeline steps), heuristic error classification (`error_code` on the job), WebVTT subtitle generation (`subtitle.build_vtt`, for the Tela 4 `<video><track>`), and HMAC-signed short-lived download URLs. See "Web service", "Worker service", and "Frontend" below for specifics. Two explicit operator decisions worth remembering: file cleanup stays **discard-on-pagehide** (not a fixed 24h expiration — Tela 4 deliberately has no "apagamos em 24h" messaging), and there is still **no accounts/quota/billing system** — cancellation is real, not a quota gate.
 
 **YouTube URL is the only input.** File upload was removed entirely (CLI, web service, and web frontend) in favor of pasting a YouTube URL — the operator never handles the source file at all. Only `youtube.com`/`youtu.be`/`m.youtube.com`/`music.youtube.com` over http/https are accepted. Trimming (start + duration) is optional and uncapped — no fixed 60s window; the frontend's trim bar is a free two-handle range over the full duration, defaulting to the whole video. When a clip duration is given, the download step uses yt-dlp's `download_ranges` to fetch only that segment instead of the whole video.
@@ -47,7 +53,7 @@ An app that takes a YouTube video (English) and returns it localized to Brazilia
 | Live progress | SSE (Server-Sent Events), backed by Redis pub/sub |
 | Frontend | Plain HTML/JS (`webapp/web/index.html`), must be swappable for React without touching the backend |
 | Transcription | faster-whisper (local, free) |
-| Translation | Gemini via `google-genai` (free tier OK for dev); provider must be pluggable |
+| Translation | Amazon Translate (default) or any LLM via OpenRouter (`google-genai`/Gemini was removed — see "Current state"); provider must be pluggable |
 | TTS (dubbing) | **Amazon Polly** (only provider implemented; Google Cloud TTS was removed by request); provider architecture stays pluggable for future options (Azure / ElevenLabs) |
 | Audio/video | ffmpeg (system dependency, only in `worker/`) |
 
@@ -72,11 +78,11 @@ An app that takes a YouTube video (English) and returns it localized to Brazilia
 Python 3.11+, two independent dependency sets:
 
 - `webapp/requirements.txt`: `fastapi`, `uvicorn[standard]`, `redis`, `yt-dlp`, `pydantic`, `python-dotenv`.
-- `worker/requirements.txt`: `redis`, `faster-whisper` (local transcription), `google-genai` (Gemini translation), `boto3` (Polly TTS), `yt-dlp` (download), `pydantic`, `python-dotenv`.
+- `worker/requirements.txt`: `redis`, `faster-whisper` (local transcription), `boto3` (Amazon Translate + Polly TTS), `requests` (OpenRouter translation), `yt-dlp` (download), `pydantic`, `python-dotenv`.
 
 System dependency (not pip, only needed inside `worker/`'s image/environment): **ffmpeg**.
 
-Secrets via environment variables only, never hardcoded: `GEMINI_API_KEY`, plus AWS credentials for Polly (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_DEFAULT_REGION`) — both live only in `worker/.env` (the webapp never needs them). See "Pluggable providers" below for why these are read explicitly instead of via boto3's default chain.
+Secrets via environment variables only, never hardcoded: AWS credentials for Amazon Translate + Polly (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_DEFAULT_REGION`), plus `OPENROUTER_API_KEY` if `TRANSLATE_PROVIDER=openrouter` — all live only in `worker/.env` (the webapp never needs them). See "Pluggable providers" below for why these are read explicitly instead of via boto3's default chain.
 
 ## Directory structure
 
@@ -107,7 +113,8 @@ webapp/                      # SERVICE 1: the site -- fully self-contained
         ├── pipeline.py       # orchestrates steps + emits progress; PipelineError
         ├── ffmpeg_utils.py   # shared run_ffmpeg/probe_duration/is_ffmpeg_available
         ├── providers/        # pluggable implementations
-        │   ├── translate_gemini.py
+        │   ├── translate_aws.py         # Amazon Translate -- default provider
+        │   ├── translate_openrouter.py  # any LLM via OpenRouter, model set by OPENROUTER_MODEL
         │   ├── translate_base.py
         │   ├── tts_polly.py  # Amazon Polly -- only TTS provider implemented
         │   └── tts_base.py   # abstract TTS interface
@@ -166,7 +173,7 @@ class TTS(Protocol):
     def synthesize(self, text: str, voice: str) -> bytes: ...  # WAV/MP3 bytes
 ```
 
-Provider selection happens via `config.TRANSLATE_PROVIDER` / `config.TTS_PROVIDER` through a simple factory (in `engine/steps/translate.py` and `engine/steps/dub.py`, respectively). Translation defaults to Gemini; `config.TTS_PROVIDER` only supports `"polly"` (`tts_polly.PollyTTS`) — Google Cloud TTS was implemented and then deliberately removed (see "Current state"). Polly returns headerless PCM from the AWS API, wrapped into a proper `.wav` via the stdlib `wave` module (PCM output only supports 8000/16000 Hz sample rates on Polly, unlike its mp3/ogg formats).
+Provider selection happens via `config.TRANSLATE_PROVIDER` / `config.TTS_PROVIDER` through a simple factory (in `engine/steps/translate.py` and `engine/steps/dub.py`, respectively). Translation defaults to `"aws"` (Amazon Translate); `"openrouter"` (any LLM behind OpenRouter's OpenAI-compatible API, model chosen via `OPENROUTER_MODEL`) is the other option — Gemini (`google-genai`) was implemented and then removed (see "Current state"). `config.TTS_PROVIDER` only supports `"polly"` (`tts_polly.PollyTTS`) — Google Cloud TTS was implemented and then deliberately removed too (see "Current state"). Polly returns headerless PCM from the AWS API, wrapped into a proper `.wav` via the stdlib `wave` module (PCM output only supports 8000/16000 Hz sample rates on Polly, unlike its mp3/ogg formats).
 
 **Security-critical: Polly credentials are read explicitly, never via boto3's default chain.** `PollyTTS.__init__` requires `config.AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`, read only from `worker/.env` (see `engine/config.py`). It deliberately does **not** call bare `boto3.client("polly")` and does **not** support AWS CLI named profiles, because either path falls back to (or can be confused with) `~/.aws/credentials`'s `default` profile, shell env vars, or an IAM instance role — any of which could belong to an unrelated AWS account. This happened once during development (a test silently ran against the operator's employer AWS account because it was the only profile configured on the machine) and was tried again with an explicit `AWS_PROFILE` env var (which also broke: an empty `AWS_PROFILE=` in `.env` still sets the process env var, and boto3 then tries to resolve a profile literally named `""` and raises `ProfileNotFound` even when explicit keys are also passed) — both approaches were rejected by the operator in favor of literal keys only. If a new cloud provider/credential integration is ever added to this project (AWS, GCP, Azure, etc.), follow this same pattern — explicit, project-scoped credentials only, never the SDK's ambient-credential discovery, and prefer literal keys in `.env` over named-profile indirection.
 
@@ -287,7 +294,7 @@ Loading `/v/{id}` directly (fresh tab, refresh, a link opened later) fully recon
 
 `webapp/.env` (see `webapp/.env.example`): `REDIS_URL`, `STORAGE_DIR`, `OUTPUTS_DIR`. Nothing else — the web service has no secrets.
 
-`worker/.env` (see `worker/.env.example`): `REDIS_URL`, storage paths (`STORAGE_DIR`/`OUTPUTS_DIR`/`WORK_DIR`), `GEMINI_API_KEY`, AWS credentials, `SOURCE_LANG`/`TARGET_LANG`, `WHISPER_MODEL`/`WHISPER_DEVICE`/`WHISPER_COMPUTE_TYPE`, `TRANSLATE_PROVIDER`/`GEMINI_MODEL`/`TRANSLATE_STYLE`, `TTS_PROVIDER`/`DUB_VOICE`/`POLLY_ENGINE`/`DUB_MAX_SPEEDUP`/`DUB_KEEP_MUSIC`, `BURN_SUBS`.
+`worker/.env` (see `worker/.env.example`): `REDIS_URL`, storage paths (`STORAGE_DIR`/`OUTPUTS_DIR`/`WORK_DIR`), AWS credentials (used by both Amazon Translate and Polly), `OPENROUTER_API_KEY`, `SOURCE_LANG`/`TARGET_LANG`, `WHISPER_MODEL`/`WHISPER_DEVICE`/`WHISPER_COMPUTE_TYPE`, `TRANSLATE_PROVIDER`/`OPENROUTER_MODEL`/`TRANSLATE_STYLE`, `TTS_PROVIDER`/`DUB_VOICE`/`POLLY_ENGINE`/`DUB_MAX_SPEEDUP`/`DUB_KEEP_MUSIC`, `BURN_SUBS`.
 
 In `docker-compose.yml`, both services get `REDIS_URL=redis://redis:6379/0` injected via `environment:` (overriding whatever's in the `.env` file, which defaults to `redis://localhost:6379/0` for non-Docker local runs).
 
@@ -330,4 +337,4 @@ Each service has its own `logging_setup.py` (`setup_logging(log_file)`; console 
 - Start everything: `docker compose up -d --build`
 - Scale worker replicas: `docker compose up -d --scale worker=3`
 - Logs: `docker compose logs -f web` / `docker compose logs -f worker`
-- Full setup/config walkthrough (obtaining `GEMINI_API_KEY` and AWS/Polly credentials): see `README.md`
+- Full setup/config walkthrough (obtaining AWS/Polly/Translate credentials, optionally `OPENROUTER_API_KEY`): see `README.md`

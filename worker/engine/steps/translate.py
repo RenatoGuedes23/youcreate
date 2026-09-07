@@ -5,9 +5,12 @@ from engine.providers.translate_base import Translator
 
 
 def _build_provider() -> Translator:
-    if config.TRANSLATE_PROVIDER == "gemini":
-        from engine.providers.translate_gemini import GeminiTranslator
-        return GeminiTranslator()
+    if config.TRANSLATE_PROVIDER == "aws":
+        from engine.providers.translate_aws import AmazonTranslate
+        return AmazonTranslate()
+    if config.TRANSLATE_PROVIDER == "openrouter":
+        from engine.providers.translate_openrouter import OpenRouterTranslator
+        return OpenRouterTranslator()
     raise ValueError(f"TRANSLATE_PROVIDER desconhecido: {config.TRANSLATE_PROVIDER!r}")
 
 

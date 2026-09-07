@@ -4,8 +4,8 @@
 python-dotenv
 redis
 faster-whisper
-google-genai
 boto3
+requests
 yt-dlp
 yt-dlp-ejs
 pydantic

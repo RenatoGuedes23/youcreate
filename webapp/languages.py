@@ -34,7 +34,7 @@ LANGUAGES = [
     {"code": "vi", "name": "Tiếng Việt"},
 ]
 
-# Traducao de saida (prompt do Gemini + voz do Polly) so esta pronta para
+# Traducao de saida (tradutor configurado no worker + voz do Polly) so esta pronta para
 # PT-BR hoje -- ver CLAUDE.md "Locked decisions". Os demais idiomas aparecem
 # na Tela 2 como opcao de "Traduzir para", mas desabilitados ("em breve").
 TARGET_ENABLED = {"pt"}
