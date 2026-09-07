@@ -19,9 +19,12 @@ _YOUTUBE_HOSTS = {
 # Cookies opcionais (Netscape cookies.txt) de uma sessao logada no YouTube --
 # o YouTube as vezes exige confirmar "nao sou um robo" antes de servir
 # metadados/video, e sem uma sessao logada nao ha como passar por isso.
-# Nunca commitado (ver .gitignore); copia propria do worker, que tem a sua
-# em engine/steps/download.py (nao compartilhado, mesma logica duplicada de
-# proposito -- ver cabecalho de queue_client.py sobre esse padrao no projeto).
+# ATENCAO: contem cookies de sessao da conta Google (SID/SAPISID/etc.) --
+# decisao explicita do operador manter versionado neste repo (nao esta no
+# .gitignore); trate como credencial sensivel mesmo assim. Copia propria do
+# worker, que tem a sua em engine/steps/download.py (nao compartilhado,
+# mesma logica duplicada de proposito -- ver cabecalho de queue_client.py
+# sobre esse padrao no projeto).
 BASE_DIR = Path(__file__).resolve().parent
 COOKIES_FILE = Path(os.environ.get("YOUTUBE_COOKIES_FILE") or (BASE_DIR / "cookies.txt"))
 

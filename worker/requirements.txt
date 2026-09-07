@@ -7,4 +7,5 @@ faster-whisper
 google-genai
 boto3
 yt-dlp
+yt-dlp-ejs
 pydantic

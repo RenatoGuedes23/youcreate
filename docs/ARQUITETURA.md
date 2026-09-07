@@ -139,6 +139,7 @@ class Segment:
 class PipelineResult:
     segments: list[Segment] = field(default_factory=list)
     srt_path: Path | None = None       # legenda PT-BR
+    vtt_path: Path | None = None       # mesma legenda em WebVTT (faixa <track> do player)
     dub_audio_path: Path | None = None # trilha dublada
     video_out: Path | None = None      # mp4 final (legenda + dublagem)
 ```
@@ -191,11 +192,15 @@ chama `translate_batch()`, escreve o resultado de volta em
 (hoje só `"gemini"`) — trocar por outro é implementar a mesma interface
 (`translate_base.py`) e adicionar um `if` na fábrica.
 
-### `engine/steps/subtitle.py` — `build_srt()`
+### `engine/steps/subtitle.py` — `build_srt()` e `build_vtt()`
 
 Monta o `.srt` no formato padrão (índice sequencial, timestamp
 `HH:MM:SS,mmm --> HH:MM:SS,mmm`, texto, linha em branco), sem dependências
-externas.
+externas. `build_vtt()` gera a mesma legenda em WebVTT (cabeçalho `WEBVTT`,
+vírgula dos milissegundos trocada por ponto) a partir dos mesmos
+`Segment` — usada pelo `<track kind="subtitles">` do player nativo da Tela 4
+do site, para não depender só da legenda queimada no vídeo quando o usuário
+escolheu "Com legenda".
 
 ### `engine/steps/dub.py` — `synthesize_dub()`
 
@@ -258,6 +263,143 @@ exceção original é embrulhada numa `PipelineError` carregando o
 `PipelineResult` parcial. Assim, se a legenda já tinha sido gerada e só a
 dublagem falhou depois, quem chamou (`worker.py`, `cli.py`) ainda consegue
 recuperar o `.srt` pronto em vez de perdê-lo.
+
+### `PipelineCancelled` — cancelamento real, só entre etapas
+
+O site tem um botão "Cancelar" de verdade (não é decoração nem um limite de
+cota disfarçado). A implementação é deliberadamente simples: `pipeline.run`
+recebe um `should_cancel: Callable[[], bool]` opcional e o chama **entre**
+cada etapa (nunca durante); se `should_cancel()` disser sim, levanta
+`PipelineCancelled(partial_result)` e para ali.
+
+Isso significa que cancelar não interrompe um `ffmpeg`, uma chamada ao
+Whisper, ao Gemini ou à Polly já em andamento — só evita que a **próxima**
+etapa comece. Foi uma escolha consciente: matar um subprocesso de ffmpeg ou
+uma chamada de API a meio caminho exigiria uma camada de cancelamento bem
+mais complexa (subprocessos com `SIGTERM`, streams parciais, etc.) para um
+ganho de responsividade pequeno — a maioria das etapas dura poucos segundos
+a poucos minutos.
+
+Quem decide *quando* `should_cancel()` deve responder "sim" é o
+`worker.py`, olhando um campo no Redis (`cancel_requested`) que o `webapp`
+seta via `POST /api/jobs/{id}/cancel`. O motor em si (`engine/`) não sabe
+que esse campo existe — só recebe uma função para chamar, mantendo o
+princípio de "motor isolado da web" (ver acima).
+
+## Classificação de erros e a Tela 5 (genérica, não uma lista fechada)
+
+Quando o pipeline falha, o `worker.py` tenta classificar a mensagem de erro
+num `error_code` curto (`_classify_error`, string matching heurístico sobre
+o texto do erro — na prática, quase sempre um erro do `yt-dlp`):
+`video_privado`, `video_indisponivel`, `restrito_regiao`, `sem_audio`, ou o
+fallback `falha_interna`. Não existe uma "API de erros estruturada" no
+`yt-dlp` — essa lista é best-effort e deve crescer conforme mensagens reais
+aparecerem em `storage/youcreate-worker.log`.
+
+O ponto importante de design: a Tela 5 do site (`webapp/web/index.html`,
+`ERROR_CONTENT`) é um **componente genérico código → conteúdo**, não uma
+tela pensada só para os casos já mapeados. Um `error_code` desconhecido (ou
+vazio) cai automaticamente no texto de `falha_interna` em vez de quebrar a
+tela — então adicionar um novo caso no `_classify_error` do backend é uma
+melhoria incremental de UX, nunca um pré-requisito para a tela funcionar. O
+mesmo componente também exibe o estado de cancelamento (`status: cancelled`,
+um "código" sintético `cancelado` que só existe no frontend) e o caso de um
+`job_id` que não é encontrado (link antigo/expirado).
+
+## URLs de download assinadas
+
+Como não há contas/sessão de usuário no projeto (ver "Locked decisions" no
+`CLAUDE.md`), não dá para proteger `/api/download/{filename}` checando "esse
+arquivo pertence a este usuário?". Em vez disso, `webapp/main.py` assina
+`{filename}:{exp}` com HMAC-SHA256 usando um segredo (`DOWNLOAD_SIGN_SECRET`,
+do `.env`, ou gerado aleatoriamente por processo se ausente) e embute
+`?exp=&sig=` na URL. `GET /api/jobs/{id}` já devolve as URLs prontas e
+assinadas (`video_url`/`srt_url`/`vtt_url`) — o frontend nunca monta uma URL
+de download sozinho, só usa o que a API respondeu. O link expira em 1h
+(`DOWNLOAD_URL_TTL_SECONDS`); gerar uma nova basta chamar `GET
+/api/jobs/{id}` de novo.
+
+Isso não substitui autenticação (qualquer um com o link ainda consegue
+baixar dentro da janela de validade) — é uma barreira contra adivinhar
+nomes de arquivo ou reusar um link indefinidamente, proporcional ao que o
+projeto realmente precisa (sem contas, single-operator).
+
+## Frontend: cinco telas roteadas no cliente
+
+`webapp/web/index.html` é um SPA de arquivo único (sem build step, sem
+framework) com cinco telas, todas compartilhando um único `:root` de tokens
+de cores/tipografia e roteadas via `history.pushState`/`popstate` (nenhuma
+delas causa reload de página):
+
+1. **Tela 1** (`/`) — colar o link.
+2. **Tela 2** (`/configurar`) — idioma de origem/destino, legenda
+   ligada/desligada, corte opcional.
+3. **Tela 3** (`/v/<id>`, enquanto `queued`/`running`) — progresso.
+4. **Tela 4** (`/v/<id>`, quando `status=done`) — player + downloads.
+5. **Tela 5** (`/v/<id>`, quando `status=error`/`cancelled`, ou o job não é
+   encontrado) — erro genérico (ver seção acima).
+
+O detalhe que faz essas cinco telas funcionarem como URLs de verdade (e não
+só como "estados de uma página"): `GET /api/jobs/{id}` devolve **tudo** que
+qualquer uma das telas 3/4/5 precisa para se desenhar (título, duração,
+idiomas, se tem legenda, `error_code`, URLs assinadas) — então abrir
+`/v/<id>` direto num navegador novo, ou dar refresh no meio do
+processamento, reconstrói o estado certo com uma única chamada, sem
+depender de nenhum estado JS que só existiria se o usuário tivesse acabado
+de submeter o formulário na Tela 2.
+
+**Arquivos ficam até o usuário sair, não por um prazo fixo.** Foi uma
+decisão explícita do operador: em vez de uma expiração de 24h anunciada na
+tela de resultado, o frontend dispara
+`navigator.sendBeacon('/api/jobs/{id}/discard')` no evento `pagehide` da
+aba — o arquivo em `storage/outputs/` só é apagado quando o visitante de
+fato navega para longe da Tela 4 (ou Tela 5, se sobrou um `.srt` parcial de
+uma dublagem que falhou). O TTL de 24h que existe (`JOB_TTL_SECONDS`) é só
+para os *metadados* no Redis, não para os arquivos em disco.
+
+## O YouTube tem duas camadas de bloqueio anti-bot, resolvidas em momentos diferentes
+
+Ao rodar contra vídeos reais (fora do ambiente de desenvolvimento), o
+`yt-dlp` bateu em duas proteções distintas do YouTube, uma escondendo a
+outra:
+
+1. **"Sign in to confirm you're not a bot"** — o YouTube exige uma sessão
+   logada para servir metadados/formatos de alguns vídeos. Resolvido
+   passando um `cookies.txt` (formato Netscape, exportado de um navegador
+   logado) via `YOUTUBE_COOKIES_FILE` — lido tanto por
+   `worker/engine/steps/download.py` quanto por `webapp/youtube_probe.py`
+   (cada um com sua própria leitura, mesma lógica duplicada de propósito,
+   ver "Visão geral" acima).
+2. **"No video formats found!"** (ou variações como "Requested format is
+   not available") — depois que a sessão logada resolveu o problema
+   anterior, apareceu um segundo bloqueio: o YouTube exige resolver um
+   desafio em JavaScript ("n challenge") antes de liberar a lista de
+   formatos, e o `yt-dlp` precisa de um **runtime JS instalado no sistema**
+   para rodar esse desafio — sem isso, ele simplesmente não encontra
+   nenhum formato válido, mesmo com cookies certos. Resolvido instalando
+   **Deno** (o runtime preferido por padrão pelo `yt-dlp` — Node só é
+   aceito a partir da v22, mais trabalhoso de conseguir no `apt` do Debian
+   `slim`) e o pacote `yt-dlp-ejs` (traz o script do desafio embutido no
+   pacote Python, sem precisar buscar nada da internet em tempo de
+   execução) em ambos os `Dockerfile`s.
+
+Vale registrar: como o YouTube segue endurecendo essas defesas com
+regularidade, é esperado que uma versão futura do `yt-dlp` ou uma mudança
+do YouTube quebre isso de novo — `pip install --upgrade yt-dlp` (e,
+possivelmente, uma versão mais nova do `yt-dlp-ejs`) costuma ser o primeiro
+passo de diagnóstico se o erro reaparecer.
+
+**Nota de segurança sobre o `cookies.txt`:** o arquivo carrega os cookies de
+sessão da conta Google usada para gerá-lo (`SID`, `SAPISID`, `HSID`,
+`__Secure-3PSID`, etc.) — equivalentes a estar logado nessa conta sem senha
+nem 2FA. Por decisão explícita do operador, `worker/cookies.txt` e
+`webapp/cookies.txt` **estão versionados no repositório** (não estão no
+`.gitignore`), incluindo num repositório GitHub público. Isso é um risco
+assumido conscientemente, não um descuido — mas vale lembrar que qualquer
+cookie desse arquivo deve ser tratado como comprometido assim que o
+commit for público, e a sessão correspondente revogada em
+`myaccount.google.com/security` se algum dia a conta usada para gerar o
+arquivo precisar ser considerada sensível de novo.
 
 ## O incidente de segurança (Amazon Polly)
 

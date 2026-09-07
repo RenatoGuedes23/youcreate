@@ -18,7 +18,9 @@ TARGET_LANG = os.environ.get("TARGET_LANG", "pt")
 
 # Cookies opcionais (Netscape cookies.txt) de uma sessao logada no YouTube --
 # usadas quando o YouTube exige confirmar "nao sou um robo" antes de servir
-# video/metadados. Nunca commitado (ver .gitignore).
+# video/metadados. ATENCAO: contem cookies de sessao da conta Google (SID/
+# SAPISID/etc.) -- decisao explicita do operador manter versionado neste
+# repo (nao esta no .gitignore); trate como credencial sensivel mesmo assim.
 YOUTUBE_COOKIES_FILE = os.environ.get("YOUTUBE_COOKIES_FILE") or str(BASE_DIR / "cookies.txt")
 
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small")

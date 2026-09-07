@@ -6,4 +6,5 @@ fastapi
 uvicorn[standard]
 redis
 yt-dlp
+yt-dlp-ejs
 pydantic
