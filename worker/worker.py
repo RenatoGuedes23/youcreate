@@ -65,6 +65,7 @@ def _process(job_id: str) -> None:
             url_clip_start=job.url_clip_start,
             url_clip_duration=job.url_clip_duration,
             source_lang=job.source_lang or None,
+            max_height=int(job.video_quality) if job.video_quality else None,
             make_subs=job.include_subtitles,
             make_dub=True,
             should_cancel=lambda: queue_client.is_cancelled(job_id),

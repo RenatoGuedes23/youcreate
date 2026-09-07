@@ -274,6 +274,23 @@
   .subtitle-opt:has(input:checked) .detail { color: var(--accent-text); }
   .subtitle-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+  /* Qualidade do video -- secao extra, nao fazia parte do spec original da
+     Tela 2 (ver docs/ARQUITETURA.md: tambem ataca a lentidao do download/
+     render, nao so preferencia de nitidez) */
+  .quality-group { margin-bottom: 40px; }
+  .quality-group legend { font-size: 19px; font-weight: 700; margin-bottom: 6px; padding: 0; }
+  .quality-group .hint { font-size: 14px; color: var(--text-3); margin-bottom: 16px; }
+  .quality-options { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .quality-opt {
+    border: 1px solid var(--border-field); padding: 16px 18px; cursor: pointer;
+  }
+  .quality-opt input[type="radio"] { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .quality-opt .name { display: block; font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+  .quality-opt .detail { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+  .quality-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-bg); }
+  .quality-opt:has(input:checked) .detail { color: var(--accent-text); }
+  .quality-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   /* Corte (trim) -- secao extra, nao faz parte do spec original da Tela 2 */
   .trim-track {
     position: relative; height: 32px;
@@ -323,6 +340,7 @@
     .video-card { flex-direction: column; }
     .video-thumb { width: 100%; height: 160px; }
     .subtitle-options { grid-template-columns: 1fr; }
+    .quality-options { grid-template-columns: 1fr; }
     .configure-bar { flex-direction: column; align-items: stretch; }
     .configure-bar .btn-primary { order: 1; width: 100%; }
     .configure-bar .btn-secondary { order: 2; width: 100%; }
@@ -504,6 +522,28 @@
             <input type="radio" name="subtitles" value="no">
             <span class="name">Só a voz</span>
             <span class="detail">MP4 dublado, sem texto na tela</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="quality-group">
+        <legend>Qualidade do vídeo</legend>
+        <p class="hint">Vídeos em qualidade menor processam mais rápido.</p>
+        <div class="quality-options">
+          <label class="quality-opt">
+            <input type="radio" name="quality" value="480">
+            <span class="name">480p</span>
+            <span class="detail">Mais rápido</span>
+          </label>
+          <label class="quality-opt">
+            <input type="radio" name="quality" value="720" checked>
+            <span class="name">720p</span>
+            <span class="detail">Recomendado</span>
+          </label>
+          <label class="quality-opt">
+            <input type="radio" name="quality" value="1080">
+            <span class="name">1080p</span>
+            <span class="detail">Mais lento</span>
           </label>
         </div>
       </fieldset>
@@ -877,16 +917,22 @@
   // Heuristica simples, nao e medicao real: transcricao/traducao/dublagem
   // escalam com a duracao do video: queimar legenda faz o render reprocessar
   // o video inteiro (mais lento) contra so copiar o stream (mais rapido).
+  // Fator de qualidade: download e render dominam o tempo total (medido na
+  // pratica) e escalam com a resolucao -- transcricao/traducao/dublagem sao
+  // so sobre audio/texto, nao mudam com a qualidade do video.
+  const QUALITY_FACTOR = { '480': 0.55, '720': 0.75, '1080': 1 };
+
   function updateEstimate() {
     if (!videoDuration) { estimateLabelEl.textContent = ''; return; }
     const includeSubtitles = getSelected('subtitles') !== 'no';
+    const quality = QUALITY_FACTOR[getSelected('quality')] ?? 0.75;
     const minutes = videoDuration / 60;
-    const factor = includeSubtitles ? 0.35 : 0.25;
+    const factor = (includeSubtitles ? 0.35 : 0.25) * quality;
     const mins = Math.max(1, Math.round(1 + minutes * factor));
     estimateLabelEl.textContent = `Cerca de ${mins} minuto${mins === 1 ? '' : 's'} para ${formatTime(videoDuration)} de vídeo`;
   }
 
-  document.querySelectorAll('input[name="subtitles"]').forEach((el) => {
+  document.querySelectorAll('input[name="subtitles"], input[name="quality"]').forEach((el) => {
     el.addEventListener('change', updateEstimate);
   });
 
@@ -1153,6 +1199,7 @@
       source_lang: sourceLang,
       target_lang: targetLang,
       include_subtitles: getSelected('subtitles') !== 'no',
+      video_quality: getSelected('quality'),
       video_title: videoTitleEl.textContent || '',
       video_duration: videoDuration || 0,
     };
@@ -1424,6 +1471,7 @@
       source_lang: status.source_lang || 'en',
       target_lang: status.target_lang || 'pt',
       include_subtitles: status.include_subtitles !== false,
+      video_quality: status.video_quality || '',
       video_title: status.video_title || '',
       video_duration: status.video_duration || 0,
     };

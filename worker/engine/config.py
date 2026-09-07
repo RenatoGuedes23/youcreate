@@ -27,9 +27,11 @@ WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "auto")
 WHISPER_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "default")
 
-# TRANSLATE_PROVIDER: aws | openrouter (Gemini foi removido -- ver
-# docs/ARQUITETURA.md, esgotava a cota do free tier com poucos videos/dia).
-TRANSLATE_PROVIDER = os.environ.get("TRANSLATE_PROVIDER", "aws")
+# TRANSLATE_PROVIDER: openrouter (unico provider hoje). Gemini foi removido
+# (esgotava a cota do free tier com poucos videos/dia) e o Amazon Translate
+# tambem foi removido depois (traducao literal, sem contexto -- ver
+# docs/ARQUITETURA.md pros dois casos).
+TRANSLATE_PROVIDER = os.environ.get("TRANSLATE_PROVIDER", "openrouter")
 # OpenRouter: gateway unico pra varios modelos de LLM -- o modelo em si e
 # trocavel via OPENROUTER_MODEL (formato "provider/modelo", ex:
 # "deepseek/deepseek-chat"), sem precisar mudar codigo, so o .env. Usado

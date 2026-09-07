@@ -4,6 +4,7 @@ Nao conhece HTTP nem jobs -- apenas o callback on_progress (e, opcionalmente,
 should_cancel, para permitir interromper entre etapas).
 """
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
@@ -56,6 +57,7 @@ def run(
     url_clip_start: float = 0.0,
     url_clip_duration: float | None = None,
     source_lang: str | None = None,
+    max_height: int | None = None,
     should_cancel: Callable[[], bool] | None = None,
 ) -> PipelineResult:
     if video_path is None and source_url is None:
@@ -71,17 +73,39 @@ def run(
     try:
         _check_cancelled()
         if source_url is not None:
-            on_progress("download", "Baixando video", 2, "Baixando video da URL informada...")
-            video_path = download.download_video(
-                source_url,
-                work_dir / "source",
-                start=url_clip_start,
-                duration=url_clip_duration,
-            )
+            # Transcricao/traducao/dublagem so precisam do audio; so o render
+            # (bem mais tarde) precisa do video. Baixar os dois em paralelo
+            # (thread por download -- ambos I/O-bound, dominados por rede)
+            # deixa o tempo combinado igual ao maior dos dois em vez da soma,
+            # ja que o audio sozinho baixa muito mais rapido que o video.
+            on_progress("download", "Baixando video", 2, "Baixando audio e video em paralelo...")
 
-        _check_cancelled()
-        on_progress("audio", "Extraindo audio", 5, "Extraindo audio do video...")
-        audio_path = audio.extract_audio(video_path, work_dir)
+            def _prepare_audio() -> Path:
+                audio_src = download.download_audio(
+                    source_url, work_dir / "source",
+                    start=url_clip_start, duration=url_clip_duration,
+                )
+                return audio.extract_audio(audio_src, work_dir)
+
+            def _prepare_video() -> Path:
+                return download.download_video(
+                    source_url, work_dir / "source",
+                    start=url_clip_start, duration=url_clip_duration,
+                    max_height=max_height,
+                )
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                audio_future = executor.submit(_prepare_audio)
+                video_future = executor.submit(_prepare_video)
+                audio_path = audio_future.result()
+                video_path = video_future.result()
+
+            _check_cancelled()
+            on_progress("audio", "Video e audio prontos", 5, "Download concluido.")
+        else:
+            _check_cancelled()
+            on_progress("audio", "Extraindo audio", 5, "Extraindo audio do video...")
+            audio_path = audio.extract_audio(video_path, work_dir)
 
         _check_cancelled()
         on_progress("transcribe", "Transcrevendo", 20, "Transcrevendo audio original...")

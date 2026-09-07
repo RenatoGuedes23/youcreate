@@ -11,6 +11,7 @@ class JobCreateRequest(BaseModel):
     include_subtitles: bool = True
     video_title: str = ""
     video_duration: float = 0.0
+    video_quality: str = ""  # "" = melhor disponivel; ou "480"/"720"/"1080"
 
 
 class JobCreated(BaseModel):
@@ -42,6 +43,7 @@ class JobStatus(BaseModel):
     video_duration: float = 0.0
     target_lang: str = ""
     include_subtitles: bool = True
+    video_quality: str = ""
     video_name: str = ""
     srt_name: str = ""
     video_url: str = ""

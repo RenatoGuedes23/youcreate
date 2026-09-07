@@ -50,6 +50,7 @@ class JobRecord:
     include_subtitles: bool = True
     video_title: str = ""
     video_duration: float = 0.0
+    video_quality: str = ""  # "" = melhor disponivel (sem limite); ou "480"/"720"/"1080" (altura em pixels)
     status: str = "queued"   # queued|running|done|error|cancelled
     pct: int = 0
     step: str = ""
@@ -76,6 +77,7 @@ def get_job(job_id: str) -> JobRecord | None:
         include_subtitles=data.get("include_subtitles", "1") == "1",
         video_title=data.get("video_title", ""),
         video_duration=float(data.get("video_duration") or 0.0),
+        video_quality=data.get("video_quality", ""),
         status=data.get("status", "queued"),
         pct=int(data.get("pct") or 0),
         step=data.get("step", ""),

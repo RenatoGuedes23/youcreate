@@ -45,16 +45,44 @@ def probe(url: str) -> dict:
     return {"duration": info.get("duration") or 0, "title": info.get("title") or ""}
 
 
+def _format_string(max_height: int | None) -> str:
+    """Formato do yt-dlp -- sem max_height, pega o melhor bv*/ba disponivel
+    (comportamento historico). Com max_height, limita a altura do video em
+    cada alternativa da cadeia de fallback, sem limitar o audio (a faixa de
+    audio pesa pouco perto do video, nao vale a pena limitar)."""
+    if not max_height:
+        return "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best"
+    return (
+        f"bv*[height<={max_height}][ext=mp4]+ba[ext=m4a]/"
+        f"b[height<={max_height}][ext=mp4]/"
+        f"bv*[height<={max_height}]+ba/"
+        f"b[height<={max_height}]"
+    )
+
+
+def _range_opts(start: float, duration: float | None) -> dict:
+    if not duration:
+        return {}
+    end = start + duration
+    return {
+        "download_ranges": lambda info, ydl, _s=start, _e=end: [{"start_time": _s, "end_time": _e}],
+        "force_keyframes_at_cuts": True,
+    }
+
+
 def download_video(
     url: str,
     out_dir: Path,
     start: float = 0.0,
     duration: float | None = None,
+    max_height: int | None = None,
 ) -> Path:
     """Baixa o video da URL para out_dir; devolve o caminho do arquivo baixado.
 
     Se duration for informado, baixa apenas o trecho start..start+duration
-    em vez do video inteiro.
+    em vez do video inteiro. Se max_height for informado (ex: 720), limita a
+    altura do video baixado -- reduz tempo de download e, mais adiante, o
+    tempo de render (menos pixels pra recodificar ao queimar legenda).
     """
     _validate_url(url)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -65,18 +93,12 @@ def download_video(
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        "format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best",
+        "format": _format_string(max_height),
         "merge_output_format": "mp4",
         "outtmpl": out_template,
         **_cookie_opts(),
+        **_range_opts(start, duration),
     }
-
-    if duration:
-        end = start + duration
-        opts["download_ranges"] = lambda info, ydl, _s=start, _e=end: [
-            {"start_time": _s, "end_time": _e}
-        ]
-        opts["force_keyframes_at_cuts"] = True
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -87,4 +109,44 @@ def download_video(
     matches = sorted(out_dir.glob(f"{stem}.*"))
     if not matches:
         raise RuntimeError("Download concluido, mas nenhum arquivo de video foi encontrado.")
+    return matches[0]
+
+
+def download_audio(
+    url: str,
+    out_dir: Path,
+    start: float = 0.0,
+    duration: float | None = None,
+) -> Path:
+    """Baixa so a trilha de audio (sem video) -- usada em paralelo com
+    download_video() para transcricao/traducao/dublagem nao precisarem
+    esperar o download do video completo (bem mais pesado que o audio
+    sozinho) para comecar. O stem tem um sufixo proprio (_audio, contra
+    _source do video) para as duas buscas por glob no mesmo out_dir nao
+    colidirem quando rodam ao mesmo tempo.
+    """
+    _validate_url(url)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem = f"{uuid.uuid4().hex[:8]}_audio"
+    out_template = str(out_dir / f"{stem}.%(ext)s")
+
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "format": "bestaudio/best",
+        "outtmpl": out_template,
+        **_cookie_opts(),
+        **_range_opts(start, duration),
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([url])
+    except yt_dlp.utils.DownloadError as exc:
+        raise RuntimeError(f"Falha ao baixar o audio da URL informada: {exc}") from exc
+
+    matches = sorted(out_dir.glob(f"{stem}.*"))
+    if not matches:
+        raise RuntimeError("Download de audio concluido, mas nenhum arquivo foi encontrado.")
     return matches[0]

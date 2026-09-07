@@ -1,12 +1,22 @@
 """Provider de traducao via OpenRouter (gateway para varios modelos de LLM).
 
-Ao contrario do AmazonTranslate (boto3, um texto por chamada), aqui a
+Unico provider de traducao do projeto hoje -- Gemini (google-genai, cota
+diaria de free tier esgotava rapido) e Amazon Translate (traducao literal,
+sem entender contexto -- "long trunks" virava "baus longos" em vez de
+"trombas compridas") foram implementados e removidos, nessa ordem. A
 chamada e um POST HTTP simples no endpoint "chat completions", compativel
 com o formato da OpenAI -- e assim que o OpenRouter expoe qualquer modelo
 por tras da mesma API, entao nao ha necessidade de um SDK proprio. O
-modelo de fato usado (OPENROUTER_MODEL, ex: "deepseek/deepseek-chat",
-"google/gemini-3.8-flash") e configuravel via .env, sem tocar em codigo --
-o objetivo inicial e comparar custo/qualidade entre modelos.
+modelo de fato usado (OPENROUTER_MODEL, hoje "deepseek/deepseek-v4-flash-0731")
+e configuravel via .env, sem tocar em codigo.
+
+Sem nenhum parametro "provider" explicito no payload, a OpenRouter usa seu
+roteamento padrao entre os varios provedores que hospedam o mesmo modelo
+(DeepInfra, OpenInference, Wafer, etc.): prioriza os estaveis (sem quedas
+recentes) e, entre esses, pondera fortemente pelos mais baratos, com
+fallback automatico se o preferido falhar -- decisao deliberada de nao
+travar num provedor especifico (ver docs/ARQUITETURA.md), que eliminaria
+esse fallback e criaria um ponto unico de falha.
 
 Traduz tudo numa unica chamada (todas as falas numeradas no prompt,
 resposta em JSON), preservando a ordem sem risco de desalinhamento.
@@ -39,7 +49,7 @@ class OpenRouterTranslator:
         if not config.OPENROUTER_MODEL:
             raise RuntimeError(
                 "OPENROUTER_MODEL nao configurado no .env deste projeto "
-                "(ex: 'deepseek/deepseek-chat', 'google/gemini-3.8-flash')."
+                "(ex: 'deepseek/deepseek-v4-flash-0731', 'google/gemini-3.8-flash')."
             )
 
     def translate_batch(self, texts: list[str]) -> list[str]:
@@ -84,12 +94,33 @@ class OpenRouterTranslator:
             "model": config.OPENROUTER_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_object"},
+            # Alguns modelos/provedores ligam "reasoning" (pensamento interno
+            # antes da resposta) por padrao mesmo sem pedir -- medido na
+            # pratica: ~7x mais tokens de saida (e de custo) numa traducao
+            # simples, sem nenhum ganho de qualidade pra essa tarefa. Tradu-
+            # cao nao precisa de raciocinio passo a passo, entao desligamos
+            # explicitamente.
+            "reasoning": {"enabled": False},
+            # Pede o custo real (em USD) da chamada de volta na resposta --
+            # usado so para log/transparencia de quanto cada job realmente
+            # gastou (o preco "de tabela" do modelo pode nao bater com o
+            # cobrado de fato, que depende de qual provedor upstream a
+            # OpenRouter escolheu para atender aquela chamada especifica).
+            "usage": {"include": True},
         }
 
         for attempt in range(_MAX_RETRIES + 1):
             response = requests.post(_API_URL, headers=headers, json=payload, timeout=120)
             if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
+                data = response.json()
+                usage = data.get("usage") or {}
+                logger.info(
+                    "OpenRouter (%s via %s): %s tokens (%s reasoning), custo real US$ %s",
+                    config.OPENROUTER_MODEL, data.get("provider", "?"),
+                    usage.get("total_tokens", "?"), usage.get("completion_tokens_details", {}).get("reasoning_tokens", "?"),
+                    usage.get("cost", "?"),
+                )
+                return data["choices"][0]["message"]["content"]
 
             retryable = response.status_code == 429 or response.status_code >= 500
             if not retryable or attempt == _MAX_RETRIES:
