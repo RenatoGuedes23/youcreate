@@ -24,6 +24,28 @@ def _build_tts_provider() -> TTS:
     raise ValueError(f"TTS_PROVIDER desconhecido: {config.TTS_PROVIDER!r}")
 
 
+# Pool de vozes PT-BR pra multi-locutor -- restrito por escolha do operador
+# a essas tres (Thiago/neural, Camila/generative, Vitoria/neural -- as que
+# soaram naturais nos testes de audio; Ricardo ficou de fora por so suportar
+# o engine "standard", mais robotico). Engine fixo por voz aqui, nao usa
+# config.POLLY_ENGINE pras vozes extras. DUB_VOICE/POLLY_ENGINE do .env
+# sempre e a primeira do pool, pra manter o comportamento de hoje (uma voz
+# so) quando a diarizacao nao detecta ou nao esta configurada.
+_EXTRA_VOICES = [
+    ("Thiago", "neural"),
+    ("Camila", "generative"),
+    ("Vitoria", "neural"),
+]
+
+
+def _voice_pool() -> list[tuple[str, str]]:
+    pool = [(config.DUB_VOICE, config.POLLY_ENGINE)]
+    for voice, engine in _EXTRA_VOICES:
+        if voice != config.DUB_VOICE:
+            pool.append((voice, engine))
+    return pool
+
+
 def _wav_info(path: Path) -> tuple[float, int]:
     """Devolve (duracao_segundos, sample_rate) de um .wav PCM."""
     with wave.open(str(path), "rb") as wf:
@@ -98,11 +120,27 @@ def synthesize_dub(segments: list[Segment], work_dir: Path) -> Path:
     work_dir.mkdir(parents=True, exist_ok=True)
     provider = _build_tts_provider()
 
+    # Cada locutor distinto (seg.speaker, preenchido pela diarizacao em
+    # diarize.py) recebe uma voz diferente do pool, na ordem em que aparece
+    # no video. Segmentos sem locutor atribuido (seg.speaker == "", inclusive
+    # o caso comum de diarizacao desligada) sempre caem no primeiro item do
+    # pool -- a voz configurada em DUB_VOICE.
+    pool = _voice_pool()
+    speaker_voice: dict[str, tuple[str, str]] = {}
+
+    def _voice_for(seg: Segment) -> tuple[str, str]:
+        if not seg.speaker:
+            return pool[0]
+        if seg.speaker not in speaker_voice:
+            speaker_voice[seg.speaker] = pool[len(speaker_voice) % len(pool)]
+        return speaker_voice[seg.speaker]
+
     fitted_paths: list[tuple[float, Path]] = []
     sample_rate = 24000
     for i, seg in enumerate(segments):
+        voice, engine = _voice_for(seg)
         raw_path = work_dir / f"dub_raw_{i:04d}.wav"
-        raw_path.write_bytes(provider.synthesize(seg.translation, config.DUB_VOICE))
+        raw_path.write_bytes(provider.synthesize(seg.translation, voice, engine))
         if i == 0:
             _, sample_rate = _wav_info(raw_path)
 

@@ -4,6 +4,8 @@
 python-dotenv
 redis
 faster-whisper
+pyannote.audio
+soundfile
 boto3
 requests
 yt-dlp

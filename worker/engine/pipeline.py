@@ -109,7 +109,26 @@ def run(
 
         _check_cancelled()
         on_progress("transcribe", "Transcrevendo", 20, "Transcrevendo audio original...")
-        segments = transcribe.transcribe(audio_path, language=source_lang or None)
+        if make_dub:
+            # Diarizacao (quem fala quando) so importa pra dublagem
+            # multi-voz -- roda em paralelo com a transcricao, ja que as
+            # duas processam o mesmo audio_path de forma independente uma
+            # da outra (nenhuma usa o resultado da outra como entrada).
+            from engine.steps import diarize
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                transcribe_future = executor.submit(
+                    transcribe.transcribe, audio_path, language=source_lang or None,
+                )
+                diarize_future = executor.submit(diarize.diarize, audio_path)
+                segments = transcribe_future.result()
+                turns = diarize_future.result()
+
+            speaker_count = diarize.assign_speakers(segments, turns)
+            if speaker_count > 1:
+                logger.info("Diarizacao detectou %d locutores distintos.", speaker_count)
+        else:
+            segments = transcribe.transcribe(audio_path, language=source_lang or None)
         result.segments = segments
 
         _check_cancelled()

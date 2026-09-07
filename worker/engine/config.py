@@ -55,4 +55,13 @@ DUB_VOICE = os.environ.get("DUB_VOICE", "Camila")
 DUB_MAX_SPEEDUP = float(os.environ.get("DUB_MAX_SPEEDUP", "1.3"))
 DUB_KEEP_MUSIC = os.environ.get("DUB_KEEP_MUSIC", "false").lower() == "true"
 
+# Diarizacao de locutor (engine/steps/diarize.py) -- opcional: sem HF_TOKEN,
+# o pipeline nao tenta diarizar e cai no comportamento historico (DUB_VOICE
+# unica pra todo mundo). Com token, cada locutor detectado no video ganha
+# uma voz Polly diferente (ver dub.py). Token de leitura basica gerado em
+# https://huggingface.co/settings/tokens, depois de aceitar os termos em
+# https://huggingface.co/pyannote/speaker-diarization-3.1 e .../segmentation-3.0.
+HF_TOKEN = os.environ.get("HF_TOKEN", "")
+DUB_ENABLE_DIARIZATION = os.environ.get("DUB_ENABLE_DIARIZATION", "true").lower() == "true"
+
 BURN_SUBS = os.environ.get("BURN_SUBS", "true").lower() == "true"

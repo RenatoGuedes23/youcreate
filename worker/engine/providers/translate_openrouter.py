@@ -27,6 +27,7 @@ objeto no topo, nao um array.
 """
 import json
 import logging
+import re
 import time
 
 import requests
@@ -38,6 +39,43 @@ logger = logging.getLogger(__name__)
 _API_URL = "https://openrouter.ai/api/v1/chat/completions"
 _MAX_RETRIES = 3
 _BACKOFF_SECONDS = (2, 5, 10)
+
+# Chaves alternativas que modelos usam na pratica em vez de "translations"
+# (chave raiz do objeto) e "tgt"/"target"/etc. (quando cada item vem como um
+# dict {src, tgt} em vez de uma string pura) -- pedimos um formato exato no
+# prompt, mas nem todo modelo segue a risca, entao o parsing tenta essas
+# variacoes antes de desistir.
+_LIST_KEYS = ("translations", "translation", "results", "output")
+_ITEM_TEXT_KEYS = ("tgt", "target", "translation", "text", "pt", "translated")
+
+
+def _extract_translations(data: dict) -> list[str]:
+    if not isinstance(data, dict):
+        raise ValueError(f"esperava um objeto JSON, recebeu {data!r}")
+
+    raw_list = next((data[key] for key in _LIST_KEYS if key in data), None)
+    if raw_list is None:
+        raise ValueError(f"nenhuma chave de lista conhecida em {list(data.keys())!r}")
+    if not isinstance(raw_list, list):
+        raise ValueError(f"esperava uma lista, recebeu {raw_list!r}")
+
+    result = []
+    for item in raw_list:
+        if isinstance(item, str):
+            text = item
+        elif isinstance(item, dict):
+            text = next((item[key] for key in _ITEM_TEXT_KEYS if key in item), None)
+            if text is None:
+                raise ValueError(f"item de traducao em formato desconhecido: {item!r}")
+            text = str(text)
+        else:
+            raise ValueError(f"item de traducao em formato desconhecido: {item!r}")
+        # Alguns modelos ecoam o prefixo "N: " (do formato numerado que
+        # mandamos no prompt) de volta na propria traducao, quando usam um
+        # formato {src, tgt} em vez do array de strings pedido -- remove
+        # esse prefixo se aparecer, pra nao vazar "0:", "1:" na legenda.
+        result.append(re.sub(r"^\d+:\s*", "", text))
+    return result
 
 
 class OpenRouterTranslator:
@@ -71,8 +109,8 @@ class OpenRouterTranslator:
 
         try:
             data = json.loads(content)
-            translations = data["translations"]
-        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            translations = _extract_translations(data)
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
             raise RuntimeError(
                 f"Resposta do OpenRouter (modelo {config.OPENROUTER_MODEL}) nao "
                 f"veio no formato esperado: {content!r}"

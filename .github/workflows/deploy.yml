@@ -1,0 +1,51 @@
+name: Deploy to EC2
+
+# So dispara em push direto na main -- deliberadamente NAO em pull_request,
+# pra secrets nunca serem expostos a um workflow rodando sobre codigo de um
+# fork (o repo e publico). Deploy manual via "Run workflow" tambem disponivel.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # A instancia EC2 e tratada como alvo de deploy, nao lugar de edicao
+      # manual -- "git reset --hard" abaixo descarta qualquer mudanca feita
+      # direto no servidor a cada deploy. Os .env sao reescritos do zero a
+      # cada vez a partir dos GitHub Secrets (nunca versionados no repo).
+      - name: Deploy via SSH (git sync + docker compose)
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          WORKER_ENV: ${{ secrets.WORKER_ENV_FILE }}
+          WEBAPP_ENV: ${{ secrets.WEBAPP_ENV_FILE }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: WORKER_ENV,WEBAPP_ENV
+          script: |
+            set -e
+            REPO_DIR=~/youcreate
+
+            if [ -d "$REPO_DIR/.git" ]; then
+              cd "$REPO_DIR"
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              git clone https://github.com/RenatoGuedes23/youcreate.git "$REPO_DIR"
+              cd "$REPO_DIR"
+            fi
+
+            printf '%s' "$WORKER_ENV" > worker/.env
+            printf '%s' "$WEBAPP_ENV" > webapp/.env
+
+            docker compose up -d --build
+            docker image prune -f
+
+            sleep 5
+            curl -sf http://localhost:8000/ > /dev/null \
+              && echo "Deploy OK: webapp respondendo" \
+              || (echo "Deploy FALHOU: webapp nao respondeu em localhost:8000" && exit 1)

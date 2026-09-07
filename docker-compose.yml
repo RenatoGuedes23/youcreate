@@ -32,7 +32,11 @@ services:
       - redis
     restart: unless-stopped
     deploy:
-      replicas: 2
+      # Fase de teste: 1 replica basta (processa 1 video por vez). Para
+      # produção com processamento simultâneo, escale via
+      # `docker compose up -d --scale worker=N` (não precisa editar este
+      # arquivo) ou suba este valor de volta.
+      replicas: 1
 
 volumes:
   redis-data:

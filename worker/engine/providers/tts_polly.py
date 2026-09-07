@@ -35,15 +35,21 @@ class PollyTTS:
             region_name=config.AWS_REGION,
         )
 
-    def synthesize(self, text: str, voice: str) -> bytes:
-        """Sintetiza text na voice dada; devolve bytes de um .wav (PCM 16kHz mono)."""
+    def synthesize(self, text: str, voice: str, engine: str | None = None) -> bytes:
+        """Sintetiza text na voice dada; devolve bytes de um .wav (PCM 16kHz mono).
+
+        engine sobrescreve config.POLLY_ENGINE so nesta chamada -- necessario
+        pra multi-voz (dub.py): nem toda voz suporta o mesmo engine (ex:
+        Ricardo so tem "standard", nao "neural"), entao cada voz do pool
+        pode precisar de um engine diferente do configurado globalmente.
+        """
         try:
             response = self._client.synthesize_speech(
                 Text=text,
                 VoiceId=voice,
                 OutputFormat="pcm",
                 SampleRate="16000",  # PCM so aceita 8000 ou 16000 no Polly
-                Engine=config.POLLY_ENGINE,
+                Engine=engine or config.POLLY_ENGINE,
             )
         except (BotoCoreError, ClientError) as exc:
             raise RuntimeError(f"Falha ao chamar o Amazon Polly: {exc}") from exc

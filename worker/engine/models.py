@@ -9,6 +9,10 @@ class Segment:
     end: float            # segundos
     text: str             # texto original (EN)
     translation: str = "" # PT-BR (preenchido na etapa de traducao)
+    speaker: str = ""     # rotulo do locutor (ex: "SPEAKER_00"), preenchido
+                           # pela diarizacao (engine/steps/diarize.py) -- vazio
+                           # se a diarizacao nao rodou ou nao identificou
+                           # ninguem sobrepondo esse trecho
 
 
 @dataclass

@@ -36,6 +36,16 @@ RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh
 
 WORKDIR /app
 
+# pyannote.audio (diarizacao, em requirements.txt) depende do PyTorch, que
+# por padrao vem com suporte a CUDA/GPU -- varios GB a mais em pacotes
+# nvidia-*/triton/cuda-toolkit -- mesmo este worker rodando 100% em CPU (sem
+# GPU em nenhum lugar desta infra). Instalar explicitamente a build CPU-only
+# do indice oficial do PyTorch ANTES do requirements.txt faz o pip ja achar
+# torch satisfeito na hora de instalar pyannote.audio, sem baixar a stack
+# CUDA por cima -- corta a imagem em mais de 1GB e a instalacao de ~8min
+# para bem menos.
+RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
