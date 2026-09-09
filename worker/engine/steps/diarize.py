@@ -23,6 +23,22 @@ logger = logging.getLogger(__name__)
 _pipeline = None  # cache do modelo carregado, mesmo padrao de transcribe.py
 
 
+class _LoggingHook:
+    """Hook do pyannote (protocolo: step_name, step_artifact, file, total,
+    completed) que so loga quando a etapa interna muda -- a chamada ao
+    pipeline fica muda por minutos em audio longo sem isso, e logar a cada
+    "completed" individual inundaria o log (segmentation roda em centenas de
+    janelas deslizantes)."""
+
+    def __init__(self):
+        self._current: str | None = None
+
+    def __call__(self, step_name, step_artifact, file=None, total=None, completed=None):
+        if step_name != self._current:
+            self._current = step_name
+            logger.info("Diarizacao: etapa '%s'...", step_name)
+
+
 def _get_pipeline():
     global _pipeline
     if _pipeline is None:
@@ -56,7 +72,14 @@ def diarize(audio_path: Path) -> list[tuple[float, float, str]]:
         waveform = torch.tensor(data, dtype=torch.float32).unsqueeze(0)
 
         pipeline = _get_pipeline()
-        output = pipeline({"waveform": waveform, "sample_rate": sample_rate})
+        logger.info(
+            "Diarizacao: iniciando (audio de %.0fs, pode levar varios minutos em CPU)...",
+            waveform.shape[-1] / sample_rate,
+        )
+        output = pipeline(
+            {"waveform": waveform, "sample_rate": sample_rate}, hook=_LoggingHook()
+        )
+        logger.info("Diarizacao: concluida.")
     except Exception:
         logger.exception("Diarizacao falhou para %s -- seguindo com voz unica.", audio_path)
         return []

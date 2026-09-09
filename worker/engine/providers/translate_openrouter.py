@@ -259,7 +259,25 @@ class OpenRouterTranslator:
         }
 
         for attempt in range(_MAX_RETRIES + 1):
-            response = requests.post(_API_URL, headers=headers, json=payload, timeout=120)
+            try:
+                response = requests.post(_API_URL, headers=headers, json=payload, timeout=120)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                # Timeout/erro de conexao nao chega a virar um status code --
+                # sem este except, escapava direto do retry loop (so tratava
+                # 429/5xx) e derrubava o job inteiro numa unica soneca da
+                # rede, mesmo com _MAX_RETRIES configurado.
+                if attempt == _MAX_RETRIES:
+                    raise RuntimeError(
+                        f"Falha ao chamar o OpenRouter (modelo {config.OPENROUTER_MODEL}): {exc}"
+                    ) from exc
+                wait = _BACKOFF_SECONDS[attempt]
+                logger.warning(
+                    "OpenRouter: erro de conexao (%s), tentativa %d/%d, aguardando %ds antes de tentar de novo.",
+                    exc, attempt + 1, _MAX_RETRIES, wait,
+                )
+                time.sleep(wait)
+                continue
+
             if response.status_code == 200:
                 data = response.json()
                 usage = data.get("usage") or {}
