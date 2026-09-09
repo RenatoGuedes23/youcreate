@@ -7,14 +7,39 @@ intervalo; se mesmo acelerado ao maximo ainda for mais longo, o clipe invade
 levemente o proximo trecho (nao e cortado). Depois, cada clipe e posicionado
 no seu tempo absoluto (adelay) e todos sao somados (amix) em uma unica trilha
 do tamanho total da fala.
+
+Caso oposto (fala PT-BR bem mais curta que o slot): investigado com um caso
+real (video da Dr. Jennifer Doudna) onde uma fala especifica do narrador
+original foi dita mais devagar que o resto do video (enfase em "CRISPR-Cas9")
+-- o Whisper mediu certo (7.5s pra 14 palavras em ingles), mas o TTS em
+ritmo normal falou a traducao em ~4s, sobrando ~3.5s de silencio morto no
+meio da dublagem. Preencher toda folga grande com silencio soa artificial;
+em vez disso, _fit_segment_clip pede uma segunda sintese mais lenta (SSML
+<prosody rate>, ver tts_polly.py) pra aproximar de como um dublador humano
+falaria mais devagar ali, e so preenche com silencio o que sobrar depois
+disso (ou a folga toda, se a voz nao aceitar SSML -- fallback silencioso).
 """
+import logging
 import wave
 from pathlib import Path
+from typing import Callable
 
 from engine import config
 from engine.ffmpeg_utils import run_ffmpeg
 from engine.models import Segment
 from engine.providers.tts_base import TTS
+
+logger = logging.getLogger(__name__)
+
+# So vale a pena tentar desacelerar quando a folga e grande o suficiente pra
+# ser perceptivel -- folgas pequenas (a pausa natural entre falas) ja sao
+# bem cobertas pelo preenchimento de silencio de sempre, sem gastar uma
+# chamada extra ao Polly.
+_SLOWDOWN_TRIGGER_RATIO = 0.85
+# Nao desacelera alem disso -- fala mais lenta que ~75% do ritmo normal
+# comeca a soar arrastada/estranha, entao a partir dai e melhor sobrar um
+# pouco de silencio do que forcar uma voz lenta demais.
+_SLOWDOWN_MIN_RATE_PERCENT = 75
 
 
 def _build_tts_provider() -> TTS:
@@ -54,8 +79,13 @@ def _wav_info(path: Path) -> tuple[float, int]:
         return (frames / rate if rate else 0.0, rate)
 
 
-def _fit_segment_clip(raw_path: Path, target_dur: float, out_path: Path) -> None:
-    """Ajusta o clipe TTS para caber em target_dur (acelera ou preenche com silencio)."""
+def _fit_segment_clip(
+    raw_path: Path,
+    target_dur: float,
+    out_path: Path,
+    resynthesize_slower: Callable[[int], bytes] | None = None,
+) -> None:
+    """Ajusta o clipe TTS para caber em target_dur (acelera, desacelera ou preenche com silencio)."""
     clip_dur, _rate = _wav_info(raw_path)
 
     if clip_dur > target_dur and clip_dur > 0:
@@ -66,16 +96,37 @@ def _fit_segment_clip(raw_path: Path, target_dur: float, out_path: Path) -> None
             "-filter:a", f"atempo={speedup:.4f}",
             str(out_path),
         ])
-    elif clip_dur < target_dur:
-        pad = target_dur - clip_dur
-        run_ffmpeg([
-            "ffmpeg", "-y",
-            "-i", str(raw_path),
-            "-af", f"apad=pad_dur={pad:.4f}",
-            str(out_path),
-        ])
-    else:
-        run_ffmpeg(["ffmpeg", "-y", "-i", str(raw_path), str(out_path)])
+        return
+
+    if clip_dur < target_dur:
+        ratio = clip_dur / target_dur if target_dur > 0 else 1.0
+        if resynthesize_slower is not None and ratio < _SLOWDOWN_TRIGGER_RATIO:
+            rate_percent = max(round(ratio * 100), _SLOWDOWN_MIN_RATE_PERCENT)
+            try:
+                slow_path = raw_path.with_name(raw_path.stem + "_slow.wav")
+                slow_path.write_bytes(resynthesize_slower(rate_percent))
+                slow_dur, _ = _wav_info(slow_path)
+                raw_path, clip_dur = slow_path, slow_dur
+            except Exception:
+                logger.warning(
+                    "Falha ao gerar versao mais lenta de %s (rate=%d%%) -- "
+                    "seguindo com preenchimento por silencio.",
+                    raw_path, rate_percent, exc_info=True,
+                )
+
+        if clip_dur < target_dur:
+            pad = target_dur - clip_dur
+            run_ffmpeg([
+                "ffmpeg", "-y",
+                "-i", str(raw_path),
+                "-af", f"apad=pad_dur={pad:.4f}",
+                str(out_path),
+            ])
+        else:
+            run_ffmpeg(["ffmpeg", "-y", "-i", str(raw_path), str(out_path)])
+        return
+
+    run_ffmpeg(["ffmpeg", "-y", "-i", str(raw_path), str(out_path)])
 
 
 def _mix_track(
@@ -146,7 +197,13 @@ def synthesize_dub(segments: list[Segment], work_dir: Path) -> Path:
 
         target_dur = max(seg.end - seg.start, 0.05)
         fitted_path = work_dir / f"dub_fit_{i:04d}.wav"
-        _fit_segment_clip(raw_path, target_dur, fitted_path)
+
+        def _resynthesize_slower(
+            rate_percent: int, _text=seg.translation, _voice=voice, _engine=engine
+        ) -> bytes:
+            return provider.synthesize(_text, _voice, _engine, rate_percent=rate_percent)
+
+        _fit_segment_clip(raw_path, target_dur, fitted_path, resynthesize_slower=_resynthesize_slower)
         fitted_paths.append((seg.start, fitted_path))
 
     total_duration = max(seg.end for seg in segments)

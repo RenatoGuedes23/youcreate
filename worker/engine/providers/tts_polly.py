@@ -9,6 +9,7 @@ maquina para outra conta (ex: da empresa).
 """
 import io
 import wave
+from xml.sax.saxutils import escape as _xml_escape
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -35,22 +36,42 @@ class PollyTTS:
             region_name=config.AWS_REGION,
         )
 
-    def synthesize(self, text: str, voice: str, engine: str | None = None) -> bytes:
+    def synthesize(
+        self, text: str, voice: str, engine: str | None = None, rate_percent: int | None = None
+    ) -> bytes:
         """Sintetiza text na voice dada; devolve bytes de um .wav (PCM 16kHz mono).
 
         engine sobrescreve config.POLLY_ENGINE so nesta chamada -- necessario
         pra multi-voz (dub.py): nem toda voz suporta o mesmo engine (ex:
         Ricardo so tem "standard", nao "neural"), entao cada voz do pool
         pode precisar de um engine diferente do configurado globalmente.
+
+        rate_percent (ex: 80 = 80% da velocidade normal) usa SSML
+        <prosody rate="X%">, suportado pelos engines standard/neural/
+        generative (rate e volume sim, pitch nao -- ver docs da AWS). Usado
+        por dub.py pra desacelerar uma fala em vez de preencher o slot com
+        silencio, quando o narrador original falou aquele trecho mais devagar
+        que o normal (ver comentario em dub.py::_fit_segment_clip).
         """
         try:
-            response = self._client.synthesize_speech(
-                Text=text,
-                VoiceId=voice,
-                OutputFormat="pcm",
-                SampleRate="16000",  # PCM so aceita 8000 ou 16000 no Polly
-                Engine=engine or config.POLLY_ENGINE,
-            )
+            if rate_percent is not None:
+                ssml = f'<speak><prosody rate="{rate_percent}%">{_xml_escape(text)}</prosody></speak>'
+                response = self._client.synthesize_speech(
+                    Text=ssml,
+                    TextType="ssml",
+                    VoiceId=voice,
+                    OutputFormat="pcm",
+                    SampleRate="16000",  # PCM so aceita 8000 ou 16000 no Polly
+                    Engine=engine or config.POLLY_ENGINE,
+                )
+            else:
+                response = self._client.synthesize_speech(
+                    Text=text,
+                    VoiceId=voice,
+                    OutputFormat="pcm",
+                    SampleRate="16000",  # PCM so aceita 8000 ou 16000 no Polly
+                    Engine=engine or config.POLLY_ENGINE,
+                )
         except (BotoCoreError, ClientError) as exc:
             raise RuntimeError(f"Falha ao chamar o Amazon Polly: {exc}") from exc
 

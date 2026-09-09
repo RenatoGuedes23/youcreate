@@ -23,7 +23,7 @@ TARGET_LANG = os.environ.get("TARGET_LANG", "pt")
 # repo (nao esta no .gitignore); trate como credencial sensivel mesmo assim.
 YOUTUBE_COOKIES_FILE = os.environ.get("YOUTUBE_COOKIES_FILE") or str(BASE_DIR / "cookies.txt")
 
-WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small")
+WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "medium")
 WHISPER_DEVICE = os.environ.get("WHISPER_DEVICE", "auto")
 WHISPER_COMPUTE_TYPE = os.environ.get("WHISPER_COMPUTE_TYPE", "default")
 

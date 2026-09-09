@@ -176,43 +176,43 @@ global (`_model`), evitando recarregar do disco a cada chamada.
 trechos de silêncio em vez de "alucinar" texto neles. Resultado: uma lista
 de `Segment` com timestamps e texto em inglês.
 
-### Tradução — dois providers, dois jeitos bem diferentes de resolver o mesmo problema
+### Tradução — um provider hoje, depois de duas tentativas removidas
 
 `engine/steps/translate.py` é o encaixe comum: extrai os textos dos
-`Segment`, chama `translate_batch(texts) -> list[str]` do provider
-ativo (`config.TRANSLATE_PROVIDER`: `"aws"` ou `"openrouter"`), escreve o
-resultado de volta em `seg.translation`. Trocar de provider é implementar
-a mesma interface (`translate_base.py`) e adicionar um `if` na fábrica.
+`Segment`, chama `translate_batch(texts, durations) -> list[str]` do
+provider ativo (`config.TRANSLATE_PROVIDER`, hoje só `"openrouter"`),
+escreve o resultado de volta em `seg.translation`. Trocar de provider é
+implementar a mesma interface (`translate_base.py`) e adicionar um `if` na
+fábrica — a interface continua pluggable mesmo só tendo uma implementação.
 
-O Gemini foi o primeiro provider implementado aqui e depois **removido por
-completo** — ver "O Gemini esgotou a cota e foi removido" mais abaixo para
-o porquê. A ideia dele (um prompt único com todas as falas numeradas,
-pedindo de volta um array JSON na mesma ordem, custando uma única chamada
-de API por vídeo) só funciona de verdade com um provider que seja um LLM
-de propósito geral seguindo instruções — por isso hoje ela sobrevive em
-`translate_openrouter.py`, não em `translate_aws.py`:
+Dois providers passaram por aqui antes e foram **removidos por completo**
+(não deixados behind uma flag): **Gemini**, primeiro — ver "O Gemini
+esgotou a cota e foi removido" mais abaixo — e depois **Amazon Translate**
+— ver "O Amazon Translate traduzia sem contexto e também foi removido"
+logo a seguir. A ideia original do Gemini (um prompt único com todas as
+falas numeradas, pedindo de volta um array JSON na mesma ordem, custando
+uma única chamada de API por vídeo) só funciona de verdade com um provider
+que seja um LLM de propósito geral seguindo instruções — por isso ela
+sobrevive hoje em `translate_openrouter.py`, o único provider restante:
 
-- **`engine/providers/translate_aws.py`** (`AmazonTranslate`, provider
-  padrão hoje) — o Amazon Translate **não é um LLM**, é um serviço de
-  tradução literal cuja API só aceita **um texto por chamada**. Não existe
-  "traduza esta lista preservando a ordem" numa chamada só. `translate_batch`
-  vira um loop chamando `translate_text` uma vez por fala, em sequência (não
-  em paralelo, para não estourar o limite de transações por segundo da
-  conta), com retry em `TooManyRequestsException`. Reaproveita as mesmas
-  credenciais AWS já exigidas para o Polly — nenhum segredo novo. Trade-off
-  visto na prática: tradução sem contexto (`"long trunks"` virou `"baús
-  longos"` em vez de `"trombas compridas"`), e `TRANSLATE_STYLE` (controle
-  de tom via prompt) simplesmente não se aplica a esse provider.
 - **`engine/providers/translate_openrouter.py`** (`OpenRouterTranslator`)
   — ponte genérica para qualquer modelo por trás do gateway OpenRouter
   (endpoint `/chat/completions`, compatível com o formato da OpenAI). O
   modelo de fato usado é so uma string de configuração
-  (`OPENROUTER_MODEL`, ex: `"deepseek/deepseek-chat"`) — trocar de modelo
-  não pede nenhuma mudança de código. Mantém o mesmo prompt em lote
+  (`OPENROUTER_MODEL`, ex: `"deepseek/deepseek-v4-flash"`) — trocar de
+  modelo não pede nenhuma mudança de código. Mantém o mesmo prompt em lote
   numerado de antes, mas pede um **objeto** JSON (`{"translations":
   [...]}`) em vez de um array solto na raiz, porque `response_format:
   json_object` — o jeito mais amplamente suportado entre modelos variados
-  de pedir JSON estruturado — geralmente exige um objeto no topo.
+  de pedir JSON estruturado — geralmente exige um objeto no topo. Cada
+  linha do prompt também vem anotada com a duração original da fala e um
+  orçamento de palavras sugerido, para a tradução já sair num tamanho mais
+  compatível com o tempo de tela (ver "Dublagem" abaixo). Como a OpenRouter
+  roteia entre múltiplos provedores upstream do mesmo modelo, um provedor
+  barato às vezes devolve HTTP 200 com o texto original ecoado em vez de
+  traduzido — `translate_batch` mede a fração de falas idênticas ao
+  original e trata isso como falha, tentando de novo, separado do retry de
+  erro HTTP.
 
 ### `engine/steps/subtitle.py` — `build_srt()` e `build_vtt()`
 
@@ -445,16 +445,33 @@ tentativas, 2s/5s/10s) para o caso mais comum de **503 "high demand"**
 (sobrecarga temporária do modelo, coisa diferente do 429 de cota) — esse
 retry funcionou bem, mas não ajuda em nada contra 429 (cota diária
 esgotada não volta em segundos). A decisão final foi **remover o Gemini
-por completo** (não deixar behind uma flag) e substituir por dois
-providers sem esse tipo de teto baixo — ver "Tradução — dois providers"
-mais acima para o que entrou no lugar (`translate_aws.py` como padrão,
-`translate_openrouter.py` como alternativa configurável por modelo).
+por completo** (não deixar behind uma flag) e substituir por
+`translate_aws.py` (Amazon Translate) como novo padrão — ver "Tradução"
+mais acima e a seção seguinte para o que aconteceu com esse substituto.
 
 Lição que ficou para qualquer provider futuro neste projeto: **antes de
 adotar um serviço com free tier, checar explicitamente os limites de
 cota/rate documentados** — um 429 de cota esgotada é um problema
 estrutural (só se resolve trocando de provider, pagando, ou esperando o
 reset), bem diferente de um 503 transitório (aí sim vale um retry).
+
+## O Amazon Translate traduzia sem contexto e também foi removido
+
+O substituto do Gemini rodou por um tempo, mas o trade-off apontado já na
+seção de tradução (acima) se confirmou incômodo na prática: o Amazon
+Translate é um serviço de tradução literal, não um LLM, e não entende
+contexto — "long trunks" (trombas compridas, num vídeo sobre elefantes)
+virou "baús longos". Sem um jeito de controlar tom/estilo via prompt
+(`TRANSLATE_STYLE` simplesmente não se aplica a essa API), a qualidade do
+texto final ficava abaixo do que o Gemini produzia, mesmo sem o problema
+de cota.
+
+A decisão foi trocar de novo, dessa vez para `translate_openrouter.py` —
+que já existia como opção configurável desde a remoção do Gemini — e
+**remover `translate_aws.py` por completo** (mesmo padrão de não deixar
+código morto behind uma flag). Isso também simplificou as credenciais: as
+chaves da AWS no `worker/.env` voltaram a servir só para o Polly
+(dublagem), e `OPENROUTER_API_KEY` passou de opcional para obrigatória.
 
 ## O incidente de segurança (Amazon Polly)
 

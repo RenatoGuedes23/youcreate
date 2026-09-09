@@ -64,10 +64,9 @@ por trás de cada peça, veja [`ARQUITETURA.md`](ARQUITETURA.md).
       3. `transcribe.py` `transcribe()` → faster-whisper (local, CPU), no
          idioma indicado por `source_lang` → lista de `Segment` com
          timestamps → 20%
-      4. `translate.py` → provider ativo (`config.TRANSLATE_PROVIDER`:
-         `translate_aws.py`/Amazon Translate por padrão, uma chamada por
-         fala; ou `translate_openrouter.py`, todas as falas numa chamada só
-         a um LLM escolhido via `OPENROUTER_MODEL`) preenche
+      4. `translate.py` → `translate_openrouter.py` (único provider hoje,
+         `config.TRANSLATE_PROVIDER=openrouter`), todas as falas numa
+         chamada só a um LLM escolhido via `OPENROUTER_MODEL`, preenche
          `seg.translation` → 45%
       5. Se `include_subtitles`: `subtitle.py` `build_srt()` **e**
          `build_vtt()` → escrevem `storage/outputs/<nome>.pt-BR.srt` e

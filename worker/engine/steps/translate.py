@@ -12,9 +12,18 @@ def _build_provider() -> Translator:
 
 
 def translate_segments(segments: list[Segment]) -> list[Segment]:
-    """Traduz o texto de todos os segmentos em lote e preenche seg.translation."""
+    """Traduz o texto de todos os segmentos em lote e preenche seg.translation.
+
+    Passa a duracao de cada fala (seg.end - seg.start) pro provider, que usa
+    isso pra sugerir um tamanho de traducao compativel com o tempo de fala
+    original -- ver comentario em translate_openrouter.py sobre por que
+    (reduz o descompasso entre a dublagem e o video que so a etapa de
+    encaixe temporal, sozinha, nao resolve bem).
+    """
     provider = _build_provider()
-    translations = provider.translate_batch([seg.text for seg in segments])
+    texts = [seg.text for seg in segments]
+    durations = [seg.end - seg.start for seg in segments]
+    translations = provider.translate_batch(texts, durations)
     for seg, translation in zip(segments, translations):
         seg.translation = translation
     return segments
