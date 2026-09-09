@@ -151,13 +151,43 @@ class OpenRouterTranslator:
     def translate_batch(
         self, texts: list[str], durations: list[float] | None = None
     ) -> list[str]:
-        """Traduz todas as falas em uma unica chamada, preservando a ordem."""
+        """Traduz todas as falas em lotes de ate OPENROUTER_BATCH_SIZE, preservando a ordem.
+
+        Uma unica chamada com o video inteiro (ex: 1400 falas) demorava
+        demais e batia no timeout com frequencia -- em teste real, precisou
+        de 3 tentativas de 300s (timeout) seguidas antes de uma finalmente
+        responder, em ~266s. Dividir em lotes menores reduz o tamanho (e
+        portanto o tempo) de cada chamada individual, tornando o timeout por
+        chamada uma protecao real em vez de quase sempre estourar. Cada lote
+        passa pela mesma logica de retry/deteccao de eco de antes, so que
+        numa fatia menor da lista -- ver _translate_one_batch.
+        """
         if not texts:
             return []
 
         if durations is None:
             durations = [0.0] * len(texts)
 
+        batch_size = config.OPENROUTER_BATCH_SIZE
+        total = len(texts)
+        num_batches = (total + batch_size - 1) // batch_size
+
+        translations: list[str] = []
+        for batch_num, start in enumerate(range(0, total, batch_size), start=1):
+            chunk_texts = texts[start:start + batch_size]
+            chunk_durations = durations[start:start + batch_size]
+            translations.extend(self._translate_one_batch(chunk_texts, chunk_durations))
+            logger.info(
+                "OpenRouter: lote %d/%d concluido (%d falas).",
+                batch_num, num_batches, len(chunk_texts),
+            )
+
+        return translations
+
+    def _translate_one_batch(
+        self, texts: list[str], durations: list[float]
+    ) -> list[str]:
+        """Traduz um unico lote (ja do tamanho certo) numa chamada, com retry e deteccao de eco."""
         lines = []
         for i, (text, duration) in enumerate(zip(texts, durations)):
             if duration > 0:
@@ -260,7 +290,7 @@ class OpenRouterTranslator:
 
         for attempt in range(_MAX_RETRIES + 1):
             try:
-                response = requests.post(_API_URL, headers=headers, json=payload, timeout=120)
+                response = requests.post(_API_URL, headers=headers, json=payload, timeout=300)
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
                 # Timeout/erro de conexao nao chega a virar um status code --
                 # sem este except, escapava direto do retry loop (so tratava

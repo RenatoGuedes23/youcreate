@@ -38,6 +38,12 @@ TRANSLATE_PROVIDER = os.environ.get("TRANSLATE_PROVIDER", "openrouter")
 # para comparar custo/qualidade entre modelos antes de fixar um definitivo.
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "")
+# Falas por chamada de traducao. Uma chamada unica com o video inteiro (ex:
+# 1400 falas) demorava demais e batia no timeout com frequencia -- ver
+# translate_openrouter.py::translate_batch. Lotes menores respondem mais
+# rapido e mais confiavel, ao custo de mais chamadas HTTP (mais overhead de
+# rede/tokens repetidos nas instrucoes do prompt).
+OPENROUTER_BATCH_SIZE = int(os.environ.get("OPENROUTER_BATCH_SIZE", "250"))
 TRANSLATE_STYLE = os.environ.get(
     "TRANSLATE_STYLE",
     "Traduza de forma natural para o portugues do Brasil, mantendo nomes "
