@@ -33,10 +33,33 @@ def _cookie_opts() -> dict:
     return {"cookiefile": str(path)} if path.exists() else {}
 
 
+def _bot_check_opts() -> dict:
+    """Mitigacoes extras contra o bloqueio "Sign in to confirm you're not a
+    bot" do YouTube, complementares aos cookies (que sozinhos as vezes nao
+    bastam, sobretudo de IP de datacenter/cloud):
+
+    - player_client=android: o cliente android do YouTube historicamente
+      nao exige a verificacao anti-bot que o cliente web (usado por
+      padrao) exige, pra muitos videos publicos. "web" fica de fallback
+      caso o android falhe por outro motivo.
+    - sleep_interval_requests: pequeno atraso entre as requisicoes internas
+      que o proprio yt-dlp faz (nao afeta o tempo de download em si) --
+      reduz o padrao de trafego que dispara heuristicas de bot, relevante
+      sobretudo com varias replicas do worker batendo no YouTube do mesmo IP.
+    """
+    return {
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "sleep_interval_requests": 1,
+    }
+
+
 def probe(url: str) -> dict:
     """Consulta duracao/titulo do video sem baixar (usado para montar a barra de corte)."""
     _validate_url(url)
-    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True, **_cookie_opts()}
+    opts = {
+        "quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True,
+        **_cookie_opts(), **_bot_check_opts(),
+    }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -97,6 +120,7 @@ def download_video(
         "merge_output_format": "mp4",
         "outtmpl": out_template,
         **_cookie_opts(),
+        **_bot_check_opts(),
         **_range_opts(start, duration),
     }
 
@@ -137,6 +161,7 @@ def download_audio(
         "format": "bestaudio/best",
         "outtmpl": out_template,
         **_cookie_opts(),
+        **_bot_check_opts(),
         **_range_opts(start, duration),
     }
 

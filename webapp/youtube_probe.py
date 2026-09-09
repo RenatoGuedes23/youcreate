@@ -40,7 +40,19 @@ def _validate_url(url: str) -> None:
 def probe(url: str) -> dict:
     """Consulta duracao/titulo do video sem baixar (usado para montar a barra de corte)."""
     _validate_url(url)
-    opts = {"quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True}
+    opts = {
+        "quiet": True, "no_warnings": True, "skip_download": True, "noplaylist": True,
+        # player_client=android: o cliente android do YouTube historicamente
+        # nao exige a verificacao "Sign in to confirm you're not a bot" que o
+        # cliente web (padrao) exige, pra muitos videos publicos -- "web"
+        # fica de fallback. sleep_interval_requests: pequeno atraso entre
+        # requisicoes internas do proprio yt-dlp, reduz o padrao de trafego
+        # que dispara heuristicas de bot. Copia da mesma mitigacao do worker
+        # (engine/steps/download.py::_bot_check_opts) -- nao compartilhado,
+        # mesmo padrao de duplicacao proposital do resto do projeto.
+        "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
+        "sleep_interval_requests": 1,
+    }
     if COOKIES_FILE.exists():
         opts["cookiefile"] = str(COOKIES_FILE)
     try:
