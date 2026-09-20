@@ -184,6 +184,7 @@ def run(
         if make_dub:
             from engine.steps import captions, reframe, render
 
+            music_audio = None
             if skip_translation:
                 on_progress("dub", "Sem dublagem", 75,
                             "Mantendo o audio original do video.")
@@ -191,8 +192,19 @@ def run(
                 from engine.steps import dub
 
                 _check_cancelled()
-                on_progress("dub", "Dublando", 75, "Gerando dublagem PT-BR...")
+                on_progress("dub", "Dublando", 72, "Gerando dublagem PT-BR...")
                 result.dub_audio_path = dub.synthesize_dub(segments, work_dir)
+
+                if config.DUB_KEEP_MUSIC:
+                    # Etapa propria no progresso porque e lenta (~45s por
+                    # minuto de audio): sem isso a tela ficaria parada na
+                    # dublagem sem explicar o porque.
+                    _check_cancelled()
+                    on_progress("separate", "Separando a trilha", 82,
+                                "Removendo a voz original e preservando a musica...")
+                    from engine.steps import separate
+
+                    music_audio = separate.extract_music(audio_path, work_dir)
 
             _check_cancelled()
             on_progress("render", "Renderizando", 90, "Montando video final...")
@@ -229,7 +241,8 @@ def run(
                 video_out,
                 opts={
                     "burn_subs": config.BURN_SUBS,
-                    "keep_music": config.DUB_KEEP_MUSIC,
+                    "music_audio": music_audio,
+                    "music_db": config.DUB_MUSIC_DB,
                     "reframe_mode": active_reframe,
                     "ass_path": ass_path,
                 },

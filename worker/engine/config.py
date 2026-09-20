@@ -59,7 +59,20 @@ AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "")
 DUB_VOICE = os.environ.get("DUB_VOICE", "Camila")
 DUB_MAX_SPEEDUP = float(os.environ.get("DUB_MAX_SPEEDUP", "1.3"))
+# Preserva a musica/ambiencia do video original sob a dublagem. A trilha
+# passa antes por separacao de fontes (engine/steps/separate.py) pra tirar a
+# voz original -- o caminho antigo, so abaixar a faixa inteira, deixava a
+# voz em ingles audivel por baixo e soou mal na pratica.
 DUB_KEEP_MUSIC = os.environ.get("DUB_KEEP_MUSIC", "false").lower() == "true"
+# Volume da trilha separada sob a dublagem. Parametro de gosto: a musica ja
+# vinha mixada pra caber sob o narrador original, e a voz do Polly costuma
+# sair mais alta -- por isso uma reducao suave, nao os -18 dB que o ducking
+# antigo precisava pra enterrar a voz que sobrava.
+DUB_MUSIC_DB = float(os.environ.get("DUB_MUSIC_DB", "-6"))
+# Processos paralelos do demucs. Medido neste projeto: 4 e o ponto otimo
+# (45s/min de audio); 12 piora pra 114s porque os processos competem pelas
+# mesmas threads de torch.
+DUB_SEPARATION_JOBS = int(os.environ.get("DUB_SEPARATION_JOBS", "4"))
 
 # Diarizacao de locutor (engine/steps/diarize.py) -- opcional: sem HF_TOKEN,
 # o pipeline nao tenta diarizar e cai no comportamento historico (DUB_VOICE

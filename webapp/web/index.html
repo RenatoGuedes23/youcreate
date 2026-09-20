@@ -665,10 +665,32 @@
     translate: 'Traduzindo o texto',
     subtitle: 'Traduzindo o texto',
     dub: 'Gerando a voz',
+    separate: 'Separando a trilha',
     render: 'Montando o vídeo',
-    done: 'Concluído',
   };
-  const PROC_STAGES = ['Baixando o vídeo', 'Transcrevendo o áudio', 'Traduzindo o texto', 'Gerando a voz', 'Montando o vídeo'];
+  // Quando o video ja esta no idioma de destino, o motor pula traducao e
+  // dublagem (engine/pipeline.py::_same_language) -- mas continua emitindo
+  // os step_ids "translate" e "dub" com outro sentido. Sem estes rotulos
+  // alternativos a tela anunciaria etapas que nao vao acontecer.
+  const PROC_LABELS_SAME_LANG = {
+    translate: 'Preparando a legenda',
+    dub: 'Mantendo o áudio original',
+  };
+
+  const PROC_STAGES_TRANSLATED = [
+    'Baixando o vídeo', 'Transcrevendo o áudio', 'Traduzindo o texto',
+    'Gerando a voz', 'Separando a trilha', 'Montando o vídeo',
+  ];
+  const PROC_STAGES_SAME_LANG = [
+    'Baixando o vídeo', 'Transcrevendo o áudio', 'Preparando a legenda',
+    'Mantendo o áudio original', 'Montando o vídeo',
+  ];
+
+  function isSameLanguageJob(status) {
+    const src = (status.source_lang || '').split('-')[0].toLowerCase();
+    const tgt = (status.target_lang || '').split('-')[0].toLowerCase();
+    return Boolean(src) && src === tgt;
+  }
 
   // Tela 5: mapa codigo de erro -> conteudo. E um componente generico e
   // extensivel -- novos codigos que o worker passar a classificar (ver
@@ -1276,6 +1298,9 @@
   // ---------- Tela 3: processando ----------
   function buildLangMeta(status) {
     if (!status.source_lang || !status.target_lang) return '';
+    if (isSameLanguageJob(status)) {
+      return `${languageName(status.target_lang)} — sem tradução`;
+    }
     return `${languageName(status.source_lang)} para ${languageName(status.target_lang)}`;
   }
 
@@ -1299,14 +1324,23 @@
     }
   }
 
+  // Guardado ao entrar na tela: renderProcStage roda tambem a cada evento
+  // SSE, quando o objeto status ja nao esta em maos.
+  let procSameLang = false;
+
   function enterProcessingScreen(status) {
     showScreen('processing');
+    procSameLang = isSameLanguageJob(status);
     procTitleEl.textContent = status.video_title || 'Vídeo';
-    const metaBits = [buildLangMeta(status), status.video_duration ? formatTime(status.video_duration) : ''].filter(Boolean);
+    const procDur = status.clip_duration || status.video_duration;
+    const metaBits = [buildLangMeta(status), procDur ? formatTime(procDur) : ''].filter(Boolean);
     procMetaEl.textContent = metaBits.join(' — ');
     loadThumbnailInto(procThumbImg, procThumbPlay, status.source_url || '');
     procNoteEl.textContent = 'Pode fechar a aba — o processamento continua e você pode voltar a este link depois.';
-    procEtaTotalMin = Math.max(1, Math.round(1 + (status.video_duration || 0) / 60 * 0.35));
+    // O trabalho e proporcional ao CLIPE, nao ao video de origem: um
+    // video de uma hora quase sempre vira um short de 60s.
+    const procSpan = status.clip_duration || status.video_duration || 0;
+    procEtaTotalMin = Math.max(1, Math.round(1 + procSpan / 60 * 0.35));
     wireCancelLink(status.id);
     renderProcStage(status.step, status.pct, status.message);
     watchJob(status.id);
@@ -1315,11 +1349,13 @@
   function renderProcStage(stepId, pct, message) {
     const safePct = pct || 0;
     procPctEl.textContent = safePct + '%';
-    const label = PROC_LABELS[stepId] || 'Preparando';
+    const labels = procSameLang ? { ...PROC_LABELS, ...PROC_LABELS_SAME_LANG } : PROC_LABELS;
+    const stages = procSameLang ? PROC_STAGES_SAME_LANG : PROC_STAGES_TRANSLATED;
+    const label = labels[stepId] || (stepId === 'done' ? 'Concluído' : 'Preparando');
     procNowEl.textContent = label;
 
-    const idx = PROC_STAGES.indexOf(label);
-    procRestEl.innerHTML = PROC_STAGES
+    const idx = stages.indexOf(label);
+    procRestEl.innerHTML = stages
       .map((stage, i) => (stage === label ? null : `<span class="${idx >= 0 && i < idx ? 'd' : ''}">${stage}</span>`))
       .filter(Boolean)
       .join(' · ');
@@ -1419,9 +1455,17 @@
 
     resultLeadEl.textContent = [buildLangMeta(status), status.include_subtitles ? 'com legenda' : 'só a voz'].filter(Boolean).join(' — ');
     resultTitleEl.textContent = status.video_title || 'Vídeo';
+    // Duracao do SHORT gerado, nao a do video de origem -- e o arquivo
+    // que o operador acabou de produzir que esta sendo descrito aqui.
+    const resultDur = status.clip_duration || status.video_duration;
+    // Sem traducao nao houve voz sintetizada: o audio e o original, e
+    // anunciar "voz em Portugues" sugeriria uma dublagem que nao existe.
+    const audioBit = isSameLanguageJob(status)
+      ? (status.include_subtitles ? 'áudio original, com legenda' : 'áudio original')
+      : ((status.include_subtitles ? 'voz e legenda em ' : 'voz em ') + languageName(status.target_lang));
     resultMetaEl.textContent = [
-      status.video_duration ? formatTime(status.video_duration) : '',
-      (status.include_subtitles ? 'voz e legenda em ' : 'voz em ') + languageName(status.target_lang),
+      resultDur ? formatTime(resultDur) : '',
+      audioBit,
     ].filter(Boolean).join(' — ');
 
     resultPlayer.src = status.video_url || '';

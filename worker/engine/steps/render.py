@@ -29,13 +29,17 @@ def build_final(video: Path, srt: Path | None, dub_audio: Path | None, out_path:
         arquivo, mas quem vai na imagem e o ASS, que controla fonte e posicao.
       - burn_subs: queima a legenda na imagem; se False e houver .srt, ele
         entra como faixa soft (mov_text).
-      - keep_music: mixa o audio original abaixado (-18 dB) sob a dublagem,
-        preservando trilha e ambiencia, em vez de substituir o audio todo.
+      - music_audio: trilha do original JA SEM a voz (engine/steps/
+        separate.py). Quando presente, e ela que vai sob a dublagem. Sem
+        ela o audio e so a dublagem -- nunca a faixa original inteira, que
+        traria a voz em ingles junto.
+      - music_db: volume da trilha sob a dublagem.
     """
     reframe_mode = opts.get("reframe_mode", reframe.MODE_CROP)
     ass_path = opts.get("ass_path")
+    music_audio = opts.get("music_audio")
+    music_db = float(opts.get("music_db", -6))
     burn_enabled = bool(opts.get("burn_subs", True))
-    keep_music = bool(opts.get("keep_music", False))
     crf = int(opts.get("crf", 20))
     preset = str(opts.get("preset", "medium"))
 
@@ -57,6 +61,11 @@ def build_final(video: Path, srt: Path | None, dub_audio: Path | None, out_path:
         dub_index = next_index
         inputs += ["-i", str(dub_audio)]
         next_index += 1
+    music_index = None
+    if dub_audio is not None and music_audio is not None:
+        music_index = next_index
+        inputs += ["-i", str(music_audio)]
+        next_index += 1
     srt_index = None
     if soft_subs:
         srt_index = next_index
@@ -76,15 +85,14 @@ def build_final(video: Path, srt: Path | None, dub_audio: Path | None, out_path:
     # --- audio ---
     audio_parts = []
     if dub_index is None:
-        # Sem dublagem: o audio original passa intacto. keep_music nao se
-        # aplica aqui -- nao ha nada sob o que abaixar a trilha.
+        # Sem dublagem (video ja no idioma de destino): o audio original
+        # passa intacto, voz e tudo -- e a voz certa.
         audio_parts.append("[0:a]anull[amixed]")
-    elif keep_music:
-        # Abaixa a faixa original e mixa sob a dublagem. Atencao: isso
-        # preserva a trilha E a voz original baixinha (estilo voice-over) --
-        # separar musica de voz exigiria um modelo de separacao de fontes.
-        audio_parts.append("[0:a]volume=-18dB[orig_low]")
-        audio_parts.append(f"[orig_low][{dub_index}:a]amix=inputs=2:duration=first:normalize=0[amixed]")
+    elif music_index is not None:
+        # Dublagem sobre a trilha JA sem a voz original. duration=first
+        # ancora na dublagem: se a musica for mais longa, corta junto.
+        audio_parts.append(f"[{music_index}:a]volume={music_db}dB[bed]")
+        audio_parts.append(f"[bed][{dub_index}:a]amix=inputs=2:duration=first:normalize=0[amixed]")
     else:
         audio_parts.append(f"[{dub_index}:a]anull[amixed]")
     # A dublagem pode terminar antes do video (ultima fala no meio do clipe);

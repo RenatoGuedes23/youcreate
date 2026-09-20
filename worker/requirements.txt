@@ -5,6 +5,10 @@ python-dotenv
 redis
 faster-whisper
 pyannote.audio
+# Separacao de fontes (engine/steps/separate.py): tira a voz original da
+# trilha pra sobrar so a musica sob a dublagem. Puxa einops/julius/lameenc;
+# torch/torchaudio ja vem do pyannote.audio.
+demucs
 soundfile
 boto3
 requests
