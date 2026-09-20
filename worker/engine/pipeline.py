@@ -84,6 +84,9 @@ def run(
 
     work_dir = work_dir or config.WORK_DIR
     result = PipelineResult()
+    # Declarado fora do try pra existir no finally mesmo se a falha
+    # acontecer antes de a separacao ser disparada.
+    separation_pool = None
 
     # Video ja no idioma de destino: nao ha o que traduzir nem o que dublar.
     # O trabalho vira so transcrever (pra ter a legenda), reenquadrar e
@@ -133,6 +136,22 @@ def run(
             _check_cancelled()
             on_progress("audio", "Extraindo audio", 5, "Extraindo audio do video...")
             audio_path = audio.extract_audio(video_path, work_dir)
+
+        # A separacao de fontes so precisa do audio, e o resultado dela so e
+        # usado la no render -- ficar na fila atras de transcricao/traducao/
+        # dublagem era tempo morto. Comeca aqui, numa thread propria, e o
+        # resultado e colhido antes do render. Mesma entrada, mesma saida:
+        # so muda quando comeca. Roda concorrente com o Whisper, entao os
+        # dois disputam CPU e o ganho e menor que os ~45-74s que a etapa
+        # levava isolada -- ainda assim, e tempo que some do caminho critico.
+        separation_future = None
+        if make_dub and not skip_translation and config.DUB_KEEP_MUSIC:
+            from engine.steps import separate
+
+            separation_pool = ThreadPoolExecutor(max_workers=1)
+            separation_future = separation_pool.submit(
+                separate.extract_music, audio_path, work_dir,
+            )
 
         _check_cancelled()
         on_progress("transcribe", "Transcrevendo", 20, "Transcrevendo audio original...")
@@ -217,16 +236,14 @@ def run(
                     subtitle.build_srt(segments, result.srt_path, translated=True)
                     subtitle.build_vtt(segments, result.vtt_path, translated=True)
 
-                if config.DUB_KEEP_MUSIC:
-                    # Etapa propria no progresso porque e lenta (~45s por
-                    # minuto de audio): sem isso a tela ficaria parada na
-                    # dublagem sem explicar o porque.
+                if separation_future is not None:
+                    # Etapa propria no progresso porque pode ainda estar
+                    # rodando: quando o resto do pipeline foi mais rapido
+                    # que ela, e aqui que se espera o que faltar.
                     _check_cancelled()
                     on_progress("separate", "Separando a trilha", 82,
                                 "Removendo a voz original e preservando a musica...")
-                    from engine.steps import separate
-
-                    music_audio = separate.extract_music(audio_path, work_dir)
+                    music_audio = separation_future.result()
 
             _check_cancelled()
             on_progress("render", "Renderizando", 90, "Montando video final...")
@@ -263,6 +280,8 @@ def run(
                 video_out,
                 opts={
                     "burn_subs": config.BURN_SUBS,
+                    "crf": config.RENDER_CRF,
+                    "preset": config.RENDER_PRESET,
                     "music_audio": music_audio,
                     "music_db": config.DUB_MUSIC_DB,
                     "reframe_mode": active_reframe,
@@ -275,6 +294,11 @@ def run(
     except Exception as exc:
         logger.exception("Falha no pipeline para %s", video_path)
         raise PipelineError(str(exc), result) from exc
+    finally:
+        # Sem isto, uma falha ou cancelamento antes do render deixaria a
+        # thread da separacao (e o processo do demucs) rodando sozinha.
+        if separation_pool is not None:
+            separation_pool.shutdown(wait=False, cancel_futures=True)
 
     on_progress("done", "Concluido", 100, "Processamento concluido.")
     logger.info("Pipeline concluido para %s", video_path)

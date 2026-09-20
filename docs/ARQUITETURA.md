@@ -38,10 +38,10 @@ prática isso significa:
   execução.
 - Cada um tem seu próprio `requirements.txt`. O `webapp` é enxuto (FastAPI,
   redis, yt-dlp, pydantic); o `worker` carrega as libs pesadas
-  (faster-whisper, google-genai, boto3) e é o único que precisa do ffmpeg
+  (faster-whisper, demucs, pyannote.audio) e é o único que precisa do ffmpeg
   instalado no sistema.
-- Cada um tem seu próprio `.env`/`.env.example` — segredos (AWS, OpenRouter)
-  ficam só em `worker/.env`, já que o `webapp` nunca precisa deles.
+- Cada um tem seu próprio `.env`/`.env.example` — os segredos (hoje apenas
+  `OPENROUTER_API_KEY` e o `HF_TOKEN` opcional) ficam só em `worker/.env`, já que o `webapp` nunca precisa deles.
 - O protocolo de comunicação (chaves e formato de dados no Redis) é
   implementado **duas vezes**, uma em cada serviço:
   `webapp/queue_client.py` (lado produtor: cria job, lê status, assina o
@@ -252,14 +252,17 @@ milissegundos), e soma tudo com `amix`. Cada fala é posicionada
 assim, se uma fala vazar um pouco para o próximo trecho (passo 2), isso não
 desalinha as falas seguintes, só sobrepõe um pouco naquele ponto específico.
 
-### `engine/providers/tts_polly.py` — Amazon Polly
+### `engine/providers/tts_openrouter.py` — TTS via OpenRouter
 
-Chama a API do Polly pedindo áudio em PCM cru (sem cabeçalho de arquivo),
-porque é o único formato onde o Polly permite 16kHz (mp3/ogg aceitam outras
-taxas, mas PCM só aceita 8000 ou 16000). Como o PCM vem "nu", o código monta
-um cabeçalho `.wav` válido usando o módulo `wave` da biblioteca padrão do
-Python (`_pcm_to_wav`), para ficar no mesmo formato que o resto do pipeline
-espera.
+Ponte para o endpoint `/audio/speech`, do mesmo jeito que
+`translate_openrouter.py` é para o `/chat/completions`: trocar de modelo ou
+de voz é mexer em `DUB_MODEL`/`DUB_VOICE`, sem tocar em código. Normaliza
+tudo para `.wav` 24 kHz mono, porque `dub.py` soma os clipes numa trilha só
+e misturar taxas quebraria o mix. Três diferenças entre modelos ficam
+isoladas aqui: formato aceito (alguns só servem PCM cru, embrulhado em
+`.wav` pelo módulo `wave`), suporte real ao parâmetro `speed` (uma
+allowlist — quem não honra cai no `atempo` do `dub.py`) e taxa de amostragem
+de origem.
 
 ### `engine/steps/render.py` — `build_final()`
 
@@ -295,7 +298,7 @@ cada etapa (nunca durante); se `should_cancel()` disser sim, levanta
 `PipelineCancelled(partial_result)` e para ali.
 
 Isso significa que cancelar não interrompe um `ffmpeg`, uma chamada ao
-Whisper, ao tradutor ativo ou à Polly já em andamento — só evita que a **próxima**
+Whisper, ao tradutor ou à síntese de voz já em andamento — só evita que a **próxima**
 etapa comece. Foi uma escolha consciente: matar um subprocesso de ffmpeg ou
 uma chamada de API a meio caminho exigiria uma camada de cancelamento bem
 mais complexa (subprocessos com `SIGTERM`, streams parciais, etc.) para um

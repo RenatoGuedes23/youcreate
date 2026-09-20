@@ -72,7 +72,7 @@ por trás de cada peça, veja [`ARQUITETURA.md`](ARQUITETURA.md).
          `build_vtt()` → escrevem `storage/outputs/<nome>.pt-BR.srt` e
          `.vtt` (o `.vtt` alimenta o `<track>` do player da Tela 4) → 60%
       6. `dub.py` `synthesize_dub()`: para cada segmento, chama
-         `tts_polly.py` (síntese real via AWS), ajusta a duração, monta a
+         `tts_openrouter.py` (síntese real), ajusta a duração, monta a
          trilha completa → 75%
       7. `render.py` `build_final()`: ffmpeg junta vídeo original + trilha
          dublada + legenda queimada (se `include_subtitles`) →
@@ -145,7 +145,7 @@ por trás de cada peça, veja [`ARQUITETURA.md`](ARQUITETURA.md).
 isso, nenhuma outra sinalização direta ao worker. O worker que estiver
 processando aquele job só vai notar na próxima checagem de
 `should_cancel()` **entre** duas etapas do pipeline (ver passo 8.3 acima);
-não há como interromper uma chamada de ffmpeg/Whisper/tradutor/Polly já em
+não há como interromper uma chamada de ffmpeg/Whisper/tradutor/TTS já em
 andamento. Na prática isso significa que "Cancelar" pode levar alguns
 segundos a um ou dois minutos para ter efeito, dependendo de qual etapa
 está rodando no momento do clique — é um trade-off deliberado de

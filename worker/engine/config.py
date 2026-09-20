@@ -50,9 +50,9 @@ TRANSLATE_STYLE = os.environ.get(
     "proprios e adaptando girias.",
 )
 
-# TTS_PROVIDER: openrouter (unico provider hoje). O Amazon Polly foi
-# implementado e removido -- as vozes do OpenRouter soaram melhor nos testes
-# comparativos e dispensam a conta AWS (uma credencial a menos no projeto).
+# TTS_PROVIDER: openrouter (unico provider hoje). Houve um provider
+# anterior, removido -- as vozes do OpenRouter soaram melhor nos testes
+# comparativos e dispensam uma segunda credencial de nuvem no projeto.
 TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "openrouter")
 # Modelo + voz padrao da dublagem. Formato do OpenRouter: "provider/modelo"
 # e o id da voz listado em supported_voices na API de modelos. Trocar de
@@ -63,9 +63,11 @@ DUB_VOICE = os.environ.get("DUB_VOICE") or "pm_alex"
 # abaixo): lista separada por virgula, cada item "modelo|voz". DUB_MODEL/
 # DUB_VOICE e sempre a primeira do pool; estas entram na ordem em que novos
 # locutores aparecem no video. Podem ser de modelos diferentes entre si.
-# `or` em vez do default de os.environ.get: a variavel vazia no .env EXISTE,
-# entao get() devolveria "" e o pool ficaria so com a voz padrao -- mesma
-# armadilha que o AWS_PROFILE vazio ja causou neste projeto.
+# `or` em vez do default de os.environ.get: DUB_VOICE_POOL= no .env EXISTE
+# como variavel vazia, entao get(chave, default) devolveria "" -- nao o
+# default -- e o pool ficaria so com a voz padrao. Vale pra toda variavel
+# aqui cujo valor em branco deva significar "usa o default"; ja custou um
+# bug neste projeto.
 DUB_VOICE_POOL = os.environ.get("DUB_VOICE_POOL") or (
     "hexgrad/kokoro-82m|pm_santa,"
     "hexgrad/kokoro-82m|pf_dora,"
@@ -78,6 +80,12 @@ DUB_VOICE_POOL = os.environ.get("DUB_VOICE_POOL") or (
     "x-ai/grok-voice-tts-1.0|sal"
 )
 DUB_MAX_SPEEDUP = float(os.environ.get("DUB_MAX_SPEEDUP", "1.3"))
+# Chamadas de sintese simultaneas (engine/steps/dub.py). Uma fala nao
+# depende do audio de outra e ~96% do tempo da etapa era espera de rede.
+# Nao altera custo (cobrado por caractere, nao por chamada) nem o audio
+# devolvido -- so deixa de esperar uma resposta pra pedir a proxima. O teto
+# existe pelo limite de taxa do provedor, nao por CPU.
+DUB_TTS_CONCURRENCY = int(os.environ.get("DUB_TTS_CONCURRENCY", "6"))
 # Quanto uma fala pode ser ADIADA pra nao tocar por cima da anterior (seg).
 # Falas que estouram o slot sao empurradas pra frente em vez de sobrepor
 # (dub.py::_stagger_starts); o atraso se dissolve na primeira pausa do
@@ -108,6 +116,18 @@ HF_TOKEN = os.environ.get("HF_TOKEN", "")
 DUB_ENABLE_DIARIZATION = os.environ.get("DUB_ENABLE_DIARIZATION", "true").lower() == "true"
 
 BURN_SUBS = os.environ.get("BURN_SUBS", "true").lower() == "true"
+
+# Qualidade do encode final (x264). CRF e a alavanca que realmente decide a
+# nitidez: menor = melhor imagem e arquivo maior. Medido neste projeto num
+# clipe real, SSIM contra o video reenquadrado sem perdas:
+#   veryfast/20 = 0.994685 (4.0s)   medium/20 = 0.995133 (9.8s)
+#   slow/20     = 0.995068 (15.4s)  medium/18 = 0.995724 (13.6s)
+# Duas conclusoes: "slow" nao compra nada sobre "medium" (fica dentro do
+# ruido e leva 57% mais tempo), e mexer no CRF rende mais que mexer no
+# preset. Como o YouTube recomprime o short no upload, entregar um arquivo
+# melhor importa mais aqui do que economizar segundos de CPU.
+RENDER_CRF = int(os.environ.get("RENDER_CRF", "18"))
+RENDER_PRESET = os.environ.get("RENDER_PRESET", "medium")
 
 # --- Formato Shorts (vertical) ---
 # Limite do YouTube Shorts: vertical/quadrado com ate 3 minutos (era 60s ate

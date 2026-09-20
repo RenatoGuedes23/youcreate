@@ -57,10 +57,17 @@ def diarize(audio_path: Path, speaker_count: int = 0) -> list[tuple[float, float
     best-effort que nao pode derrubar o pipeline inteiro.
 
     speaker_count > 0 e o numero de pessoas informado pelo operador na Tela
-    2: repassado ao pyannote como num_speakers, tira dele a tarefa de
-    estimar quantos locutores existem (a parte que mais erra em audio curto
-    ou com musica). speaker_count == 1 nem chega aqui -- o pipeline pula a
-    etapa inteira, ver pipeline.py."""
+    2, repassado ao pyannote como TETO (max_speakers), nao como numero
+    exato. A diferenca nao e cosmetica: num_speakers=N obriga o modelo a
+    devolver N grupos mesmo que so exista uma pessoa falando, e ele entao
+    parte a MESMA voz em N grupos artificiais (usando variacao de tom,
+    respiracao, musica ao fundo). Como dub.py da uma voz diferente do pool
+    a cada grupo, o mesmo narrador sairia dublado com N vozes trocando no
+    meio do video -- inclusive trocando de genero. Com max_speakers o
+    numero vira um limite superior: o modelo pode concluir que ha so um
+    locutor, e o palpite errado do operador deixa de ser catastrofico.
+    speaker_count == 1 nem chega aqui -- o pipeline pula a etapa inteira,
+    ver pipeline.py."""
     if not config.DUB_ENABLE_DIARIZATION or not config.HF_TOKEN:
         return []
 
@@ -84,8 +91,9 @@ def diarize(audio_path: Path, speaker_count: int = 0) -> list[tuple[float, float
         )
         kwargs = {"hook": _LoggingHook()}
         if speaker_count > 1:
-            kwargs["num_speakers"] = speaker_count
-            logger.info("Diarizacao: procurando exatamente %d locutores.", speaker_count)
+            kwargs["min_speakers"] = 1
+            kwargs["max_speakers"] = speaker_count
+            logger.info("Diarizacao: procurando entre 1 e %d locutores.", speaker_count)
         output = pipeline(
             {"waveform": waveform, "sample_rate": sample_rate}, **kwargs
         )
@@ -103,15 +111,27 @@ def diarize(audio_path: Path, speaker_count: int = 0) -> list[tuple[float, float
     ]
 
 
+# Fracao minima das falas que um locutor precisa concentrar pra valer uma
+# voz propria. Abaixo disso quase sempre e artefato -- uma respiracao, um
+# trecho de musica, meia palavra que o modelo agrupou a parte. Dar uma voz
+# diferente do pool a um caco desses troca a voz do video por dois segundos
+# e soa como defeito, nao como segundo locutor.
+_MIN_SPEAKER_SHARE = 0.10
+
+
 def assign_speakers(segments: list[Segment], turns: list[tuple[float, float, str]]) -> int:
     """Preenche seg.speaker com o locutor de maior sobreposicao de tempo,
     para cada segmento. Devolve quantos locutores distintos foram
     atribuidos (0 se turns estiver vazio, ou se nenhum segmento sobrepor
-    algum turno detectado)."""
+    algum turno detectado).
+
+    Locutores com participacao irrisoria (< _MIN_SPEAKER_SHARE das falas)
+    sao absorvidos pelo locutor dominante antes de devolver: e melhor uma
+    voz a menos que uma troca de voz que o espectador le como erro.
+    """
     if not turns:
         return 0
 
-    speakers_seen: set[str] = set()
     for seg in segments:
         best_overlap = 0.0
         best_speaker = ""
@@ -121,6 +141,29 @@ def assign_speakers(segments: list[Segment], turns: list[tuple[float, float, str
                 best_overlap = overlap
                 best_speaker = speaker
         seg.speaker = best_speaker
-        if best_speaker:
-            speakers_seen.add(best_speaker)
-    return len(speakers_seen)
+
+    atribuidos = [seg for seg in segments if seg.speaker]
+    if not atribuidos:
+        return 0
+
+    contagem: dict[str, int] = {}
+    for seg in atribuidos:
+        contagem[seg.speaker] = contagem.get(seg.speaker, 0) + 1
+
+    dominante = max(contagem, key=lambda k: contagem[k])
+    # O piso de 2 importa em clipe curto: com 8 falas, 10% da 0.8 e nenhum
+    # locutor ficaria abaixo disso -- um locutor de UMA fala passaria e
+    # ganharia voz propria por dois segundos.
+    minimo = max(2.0, len(atribuidos) * _MIN_SPEAKER_SHARE)
+    residuais = {k for k, n in contagem.items() if n < minimo and k != dominante}
+    if residuais:
+        logger.info(
+            "Diarizacao: %d locutor(es) com participacao irrisoria absorvidos "
+            "pelo dominante (de %d para %d vozes).",
+            len(residuais), len(contagem), len(contagem) - len(residuais),
+        )
+        for seg in atribuidos:
+            if seg.speaker in residuais:
+                seg.speaker = dominante
+
+    return len({seg.speaker for seg in atribuidos})

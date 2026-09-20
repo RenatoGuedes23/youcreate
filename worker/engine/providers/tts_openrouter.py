@@ -3,7 +3,7 @@
 Uma ponte generica pro endpoint de fala do OpenRouter, do mesmo jeito que
 translate_openrouter.py e pro /chat/completions: qualquer modelo de TTS que
 o OpenRouter carregue pode ser usado so trocando DUB_MODEL/DUB_VOICE no
-.env, sem mexer em codigo. Substituiu o Amazon Polly, que foi removido.
+.env, sem mexer em codigo.
 
 Tres diferencas entre modelos que o codigo precisa conhecer, todas medidas
 nesta conta (nao estao documentadas juntas em lugar nenhum):

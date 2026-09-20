@@ -25,6 +25,7 @@ o Gemini, hoje o padrao, ignora o parametro).
 """
 import logging
 import wave
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
@@ -276,14 +277,18 @@ def synthesize_dub(segments: list[Segment], work_dir: Path) -> Path:
             speaker_voice[seg.speaker] = pool[len(speaker_voice) % len(pool)]
         return speaker_voice[seg.speaker]
 
-    fitted_paths: list[tuple[float, Path]] = []
-    sample_rate = 24000
-    for i, seg in enumerate(segments):
-        model, voice = _voice_for(seg)
+    # A atribuicao de voz roda ANTES e em sequencia, de proposito: cada
+    # locutor novo pega a proxima voz do pool na ordem em que aparece no
+    # video, e isso depende da ordem dos segmentos. Feita dentro das
+    # threads, a ordem viraria corrida e o mesmo video daria vozes
+    # diferentes a cada execucao.
+    voices = [_voice_for(seg) for seg in segments]
+
+    def _make_clip(i: int) -> Path:
+        seg = segments[i]
+        model, voice = voices[i]
         raw_path = work_dir / f"dub_raw_{i:04d}.wav"
         raw_path.write_bytes(provider.synthesize(seg.translation, voice, model))
-        if i == 0:
-            _, sample_rate = _wav_info(raw_path)
 
         target_dur = max(seg.end - seg.start, 0.05)
         fitted_path = work_dir / f"dub_fit_{i:04d}.wav"
@@ -304,7 +309,29 @@ def synthesize_dub(segments: list[Segment], work_dir: Path) -> Path:
             resynthesize_slower=_resynthesize,
             resynthesize_fast=_resynthesize,  # mesma chamada; speed>1 acelera
         )
-        fitted_paths.append((seg.start, fitted_path))
+        return fitted_path
+
+    # Uma fala nao depende do audio de nenhuma outra, e ~96% do tempo desta
+    # etapa era espera de rede (medido): as chamadas rodam concorrentes.
+    # Nao muda nada do que e enviado nem do que volta -- o custo e por
+    # caractere sintetizado, nao por chamada, e o audio e identico. O teto
+    # existe pra nao disparar o limite de taxa do provedor.
+    # executor.map preserva a ordem de entrada, entao fitted[i] continua
+    # sendo o clipe do segmento i.
+    workers = max(1, min(config.DUB_TTS_CONCURRENCY, len(segments)))
+    logger.info(
+        "Dublagem: sintetizando %d falas com ate %d chamadas simultaneas.",
+        len(segments), workers,
+    )
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        fitted = list(executor.map(_make_clip, range(len(segments))))
+
+    fitted_paths: list[tuple[float, Path]] = [
+        (seg.start, path) for seg, path in zip(segments, fitted)
+    ]
+    # A taxa de amostragem sai do primeiro clipe pronto (o provider
+    # normaliza todos pra mesma taxa; ver tts_openrouter._SAMPLE_RATE).
+    _, sample_rate = _wav_info(fitted[0])
 
     fitted_paths = _stagger_starts(fitted_paths)
 
