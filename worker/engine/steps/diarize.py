@@ -2,7 +2,7 @@
 
 Roda sobre o mesmo .wav ja extraido para a transcricao -- nao baixa nada
 novo, so mais uma passada sobre o mesmo arquivo. Usada so para dub.py poder
-atribuir uma voz Polly diferente por locutor detectado; se estiver desligada
+atribuir uma voz diferente por locutor detectado; se estiver desligada
 (DUB_ENABLE_DIARIZATION=false ou sem HF_TOKEN) ou falhar por qualquer motivo,
 devolve lista vazia e o pipeline cai de volta no comportamento historico
 (uma unica voz pra todo mundo, ver dub.py).
@@ -50,11 +50,17 @@ def _get_pipeline():
     return _pipeline
 
 
-def diarize(audio_path: Path) -> list[tuple[float, float, str]]:
+def diarize(audio_path: Path, speaker_count: int = 0) -> list[tuple[float, float, str]]:
     """Devolve uma lista de (start, end, speaker_label) em segundos, uma por
     trecho de fala continua de um locutor. Lista vazia se a diarizacao
     estiver desligada ou falhar -- nunca levanta excecao, e uma etapa
-    best-effort que nao pode derrubar o pipeline inteiro."""
+    best-effort que nao pode derrubar o pipeline inteiro.
+
+    speaker_count > 0 e o numero de pessoas informado pelo operador na Tela
+    2: repassado ao pyannote como num_speakers, tira dele a tarefa de
+    estimar quantos locutores existem (a parte que mais erra em audio curto
+    ou com musica). speaker_count == 1 nem chega aqui -- o pipeline pula a
+    etapa inteira, ver pipeline.py."""
     if not config.DUB_ENABLE_DIARIZATION or not config.HF_TOKEN:
         return []
 
@@ -76,8 +82,12 @@ def diarize(audio_path: Path) -> list[tuple[float, float, str]]:
             "Diarizacao: iniciando (audio de %.0fs, pode levar varios minutos em CPU)...",
             waveform.shape[-1] / sample_rate,
         )
+        kwargs = {"hook": _LoggingHook()}
+        if speaker_count > 1:
+            kwargs["num_speakers"] = speaker_count
+            logger.info("Diarizacao: procurando exatamente %d locutores.", speaker_count)
         output = pipeline(
-            {"waveform": waveform, "sample_rate": sample_rate}, hook=_LoggingHook()
+            {"waveform": waveform, "sample_rate": sample_rate}, **kwargs
         )
         logger.info("Diarizacao: concluida.")
     except Exception:

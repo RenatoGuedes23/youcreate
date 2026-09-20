@@ -1,6 +1,6 @@
 # Worker: roda o motor de verdade (download, transcricao, traducao,
 # dublagem, render) -- precisa do ffmpeg no sistema e das libs pesadas
-# (faster-whisper, google-genai, boto3).
+# (faster-whisper, demucs, pyannote).
 # Build context = esta propria pasta (worker/) -- imagem 100% autocontida,
 # inclui o motor inteiro (engine/).
 FROM python:3.11-slim

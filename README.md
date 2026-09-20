@@ -135,30 +135,30 @@ cd worker && python cli.py "https://www.youtube.com/watch?v=..." --start 30 --du
 
 ## Obtendo as chaves (`worker/.env`)
 
-### Credenciais da AWS (dublagem — Amazon Polly)
+### Dublagem e tradução usam a mesma chave
 
-Único provider de dublagem. Não é mais usado para tradução (ver abaixo).
+O youcreate usa **uma única credencial**: a `OPENROUTER_API_KEY`. Ela cobre
+tanto a tradução (`/chat/completions`) quanto a dublagem
+(`/audio/speech`). O Amazon Polly foi o provider de dublagem original e foi
+**removido** — as vozes do OpenRouter soaram melhor em teste comparativo e
+dispensam a conta AWS.
 
-1. Crie (ou use) um usuário IAM com a permissão `polly:SynthesizeSpeech`, e
-   gere um Access Key ID + Secret Access Key para ele
-2. No `worker/.env`, defina:
-   ```
-   AWS_ACCESS_KEY_ID=...
-   AWS_SECRET_ACCESS_KEY=...
-   AWS_DEFAULT_REGION=us-east-1
-   ```
-3. `DUB_VOICE` deve ser o `VoiceId` do Polly (ex: `Thiago`, voz masculina
-   PT-BR). `POLLY_ENGINE` é `standard`, `neural` ou `generative` — nem toda
-   região da AWS suporta os motores mais novos, confira em "Feature and
-   Region Compatibility" no console do Polly.
+A voz padrão é `pm_alex`, do `hexgrad/kokoro-82m` — escolhido por ser o único modelo testado que honra o parâmetro `speed`, o que deixa a fala dublada encaixada no tempo do vídeo. Para
+trocar, ajuste `DUB_MODEL` e `DUB_VOICE` no `worker/.env`; os ids de voz de
+cada modelo estão em `supported_voices` na API de modelos do OpenRouter:
 
-**Importante:** o youcreate **nunca** usa o perfil `default` nem credenciais
-"ambiente" da máquina (variáveis do shell, `~/.aws/credentials`, IAM role) —
-só as chaves definidas explicitamente no `.env`. Isso evita usar por engano
-uma conta AWS de outro projeto/empresa que porventura já esteja configurada
-na mesma máquina.
+```bash
+curl -s -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  "https://openrouter.ai/api/v1/models?output_modalities=speech" \
+  | jq -r '.data[] | "\(.id): \(.supported_voices // [] | join(", "))"'
+```
 
-Sem essas credenciais a dublagem não funciona — é obrigatória.
+`DUB_VOICE_POOL` lista as vozes extras usadas quando o vídeo tem mais de um
+locutor (formato `modelo|voz`, separado por vírgula, pode misturar
+modelos). Dois avisos práticos: nem todo modelo aceita `response_format:
+mp3` (o Gemini só aceita `pcm`) e nem todo modelo honra o parâmetro
+`speed` — quando não honra, o encaixe temporal da fala é feito com
+`atempo`, que soa pior. O código trata os dois casos automaticamente.
 
 ### `OPENROUTER_API_KEY` (tradução — obrigatório, único provider)
 

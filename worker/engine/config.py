@@ -50,34 +50,58 @@ TRANSLATE_STYLE = os.environ.get(
     "proprios e adaptando girias.",
 )
 
-TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "polly")
-POLLY_ENGINE = os.environ.get("POLLY_ENGINE", "standard")  # standard|neural (nem toda regiao suporta neural)
-# Lidas explicitamente (nao via cadeia padrao do boto3) para nunca usar por
-# engano um perfil/credencial ja configurado na maquina (ex: da empresa).
-AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "")
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "")
-DUB_VOICE = os.environ.get("DUB_VOICE", "Camila")
+# TTS_PROVIDER: openrouter (unico provider hoje). O Amazon Polly foi
+# implementado e removido -- as vozes do OpenRouter soaram melhor nos testes
+# comparativos e dispensam a conta AWS (uma credencial a menos no projeto).
+TTS_PROVIDER = os.environ.get("TTS_PROVIDER", "openrouter")
+# Modelo + voz padrao da dublagem. Formato do OpenRouter: "provider/modelo"
+# e o id da voz listado em supported_voices na API de modelos. Trocar de
+# modelo/voz e so mexer aqui -- nao ha codigo especifico por voz.
+DUB_MODEL = os.environ.get("DUB_MODEL") or "hexgrad/kokoro-82m"
+DUB_VOICE = os.environ.get("DUB_VOICE") or "pm_alex"
+# Vozes adicionais pra videos com mais de um locutor (ver diarizacao
+# abaixo): lista separada por virgula, cada item "modelo|voz". DUB_MODEL/
+# DUB_VOICE e sempre a primeira do pool; estas entram na ordem em que novos
+# locutores aparecem no video. Podem ser de modelos diferentes entre si.
+# `or` em vez do default de os.environ.get: a variavel vazia no .env EXISTE,
+# entao get() devolveria "" e o pool ficaria so com a voz padrao -- mesma
+# armadilha que o AWS_PROFILE vazio ja causou neste projeto.
+DUB_VOICE_POOL = os.environ.get("DUB_VOICE_POOL") or (
+    "hexgrad/kokoro-82m|pm_santa,"
+    "hexgrad/kokoro-82m|pf_dora,"
+    "google/gemini-3.1-flash-tts-preview|Algieba,"
+    "google/gemini-3.1-flash-tts-preview|Charon,"
+    "google/gemini-3.1-flash-tts-preview|Orus,"
+    "google/gemini-3.1-flash-tts-preview|Puck,"
+    "x-ai/grok-voice-tts-1.0|rex,"
+    "x-ai/grok-voice-tts-1.0|leo,"
+    "x-ai/grok-voice-tts-1.0|sal"
+)
 DUB_MAX_SPEEDUP = float(os.environ.get("DUB_MAX_SPEEDUP", "1.3"))
+# Quanto uma fala pode ser ADIADA pra nao tocar por cima da anterior (seg).
+# Falas que estouram o slot sao empurradas pra frente em vez de sobrepor
+# (dub.py::_stagger_starts); o atraso se dissolve na primeira pausa do
+# video. Acima deste teto preferimos a sobreposicao, porque a dublagem
+# sairia de sincronia com a imagem de forma perceptivel.
+DUB_MAX_DRIFT = float(os.environ.get("DUB_MAX_DRIFT", "1.5"))
 # Preserva a musica/ambiencia do video original sob a dublagem. A trilha
 # passa antes por separacao de fontes (engine/steps/separate.py) pra tirar a
 # voz original -- o caminho antigo, so abaixar a faixa inteira, deixava a
 # voz em ingles audivel por baixo e soou mal na pratica.
 DUB_KEEP_MUSIC = os.environ.get("DUB_KEEP_MUSIC", "false").lower() == "true"
 # Volume da trilha separada sob a dublagem. Parametro de gosto: a musica ja
-# vinha mixada pra caber sob o narrador original, e a voz do Polly costuma
-# sair mais alta -- por isso uma reducao suave, nao os -18 dB que o ducking
-# antigo precisava pra enterrar a voz que sobrava.
+# vinha mixada pra caber sob o narrador original, e a voz sintetizada
+# costuma sair mais alta -- por isso uma reducao suave, nao os -18 dB que o
+# ducking antigo precisava pra enterrar a voz que sobrava.
 DUB_MUSIC_DB = float(os.environ.get("DUB_MUSIC_DB", "-6"))
 # Processos paralelos do demucs. Medido neste projeto: 4 e o ponto otimo
 # (45s/min de audio); 12 piora pra 114s porque os processos competem pelas
 # mesmas threads de torch.
 DUB_SEPARATION_JOBS = int(os.environ.get("DUB_SEPARATION_JOBS", "4"))
-
 # Diarizacao de locutor (engine/steps/diarize.py) -- opcional: sem HF_TOKEN,
 # o pipeline nao tenta diarizar e cai no comportamento historico (DUB_VOICE
 # unica pra todo mundo). Com token, cada locutor detectado no video ganha
-# uma voz Polly diferente (ver dub.py). Token de leitura basica gerado em
+# uma voz diferente do pool (ver dub.py e DUB_VOICE_POOL). Token de leitura gerado em
 # https://huggingface.co/settings/tokens, depois de aceitar os termos em
 # https://huggingface.co/pyannote/speaker-diarization-3.1 e .../segmentation-3.0.
 HF_TOKEN = os.environ.get("HF_TOKEN", "")

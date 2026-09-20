@@ -56,6 +56,7 @@ class JobRecord:
     # Ou um valor explicito em pixels: "480"/"720"/"1080"/"2160".
     video_quality: str = ""
     reframe_mode: str = ""   # "" = padrao do worker; ou crop|blur|none
+    speaker_count: int = 0   # 0 = automatico (diarizacao decide)
     status: str = "queued"   # queued|running|done|error|cancelled
     pct: int = 0
     step: str = ""
@@ -84,6 +85,7 @@ def get_job(job_id: str) -> JobRecord | None:
         video_duration=float(data.get("video_duration") or 0.0),
         video_quality=data.get("video_quality", ""),
         reframe_mode=data.get("reframe_mode", ""),
+        speaker_count=int(data.get("speaker_count") or 0),
         status=data.get("status", "queued"),
         pct=int(data.get("pct") or 0),
         step=data.get("step", ""),

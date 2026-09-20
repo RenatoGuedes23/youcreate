@@ -56,7 +56,8 @@ class JobRecord:
     # desfocado). Ver engine/steps/reframe.py::recommended_max_height.
     # Ou um valor explicito em pixels: "480"/"720"/"1080"/"2160".
     video_quality: str = ""
-    reframe_mode: str = ""   # "" = padrao do worker; ou crop|blur|none
+    reframe_mode: str = ""
+    speaker_count: int = 0   # 0 = automatico (diarizacao decide)
     status: str = "queued"   # queued|running|done|error|cancelled
     pct: int = 0
     step: str = ""
@@ -79,6 +80,7 @@ def create_job(
     video_duration: float = 0.0,
     video_quality: str = "",
     reframe_mode: str = "",
+    speaker_count: int = 0,
 ) -> str:
     """Cria o job no Redis e o enfileira para o worker pegar; devolve o id."""
     job_id = str(uuid.uuid4())
@@ -97,6 +99,7 @@ def create_job(
         "video_duration": video_duration,
         "video_quality": video_quality,
         "reframe_mode": reframe_mode,
+        "speaker_count": speaker_count,
         "status": "queued",
         "pct": 0,
         "step": "",
@@ -129,6 +132,7 @@ def get_job(job_id: str) -> JobRecord | None:
         video_duration=float(data.get("video_duration") or 0.0),
         video_quality=data.get("video_quality", ""),
         reframe_mode=data.get("reframe_mode", ""),
+        speaker_count=int(data.get("speaker_count") or 0),
         status=data.get("status", "queued"),
         pct=int(data.get("pct") or 0),
         step=data.get("step", ""),

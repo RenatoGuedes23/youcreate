@@ -544,6 +544,21 @@
         </div>
       </fieldset>
 
+      <fieldset class="lang-section" id="speakers-section">
+        <legend>Pessoas falando</legend>
+        <p class="hint">Quantas vozes diferentes aparecem no trecho. Se não souber, deixe em automático.</p>
+        <select class="lang-select" id="speaker-count-select">
+          <option value="0" selected>Automático — o sistema detecta</option>
+          <option value="1">1 pessoa</option>
+          <option value="2">2 pessoas</option>
+          <option value="3">3 pessoas</option>
+          <option value="4">4 pessoas</option>
+          <option value="5">5 pessoas</option>
+          <option value="6">6 pessoas</option>
+        </select>
+        <p class="lang-note" id="speaker-note" hidden aria-live="polite"></p>
+      </fieldset>
+
       <fieldset class="lang-section" id="trim-section" hidden>
         <legend>Corte</legend>
         <p class="hint">O short tem 60 segundos. Arraste a janela — ou clique na barra — para escolher qual trecho do vídeo entra.</p>
@@ -776,6 +791,9 @@
   const targetLangSelect = document.getElementById('target-lang-select');
   const targetLangError = document.getElementById('target-lang-error');
   const langNoteEl = document.getElementById('lang-note');
+  const speakerCountEl = document.getElementById('speaker-count-select');
+  const speakerNoteEl = document.getElementById('speaker-note');
+  const speakersSectionEl = document.getElementById('speakers-section');
   const estimateLabelEl = document.getElementById('estimate-label');
 
   const trimSection = document.getElementById('trim-section');
@@ -923,6 +941,7 @@
   }
 
   function updateLangNote() {
+    refreshSpeakerNote();
     if (sameLanguageSelected()) {
       const name = targetLangSelect.options[targetLangSelect.selectedIndex]?.textContent || 'esse idioma';
       langNoteEl.hidden = false;
@@ -933,6 +952,9 @@
     } else {
       langNoteEl.hidden = true;
     }
+    // Mesmo idioma = sem dublagem, entao nao ha vozes a distribuir e a
+    // pergunta sobre quantas pessoas falam nao tem efeito nenhum.
+    speakersSectionEl.hidden = sameLanguageSelected();
     updateEstimate();
   }
 
@@ -992,10 +1014,32 @@
     const base = sameLanguageSelected()
       ? (includeSubtitles ? 0.15 : 0.12)
       : (includeSubtitles ? 0.35 : 0.25);
-    const factor = base * quality;
+    // Com 1 locutor informado o worker pula a diarizacao, que e uma fatia
+    // real do tempo total -- a estimativa tem que cair junto, senao a nota
+    // "fica mais rapido" nao se reflete no numero logo abaixo dela.
+    const diarizacao = (!sameLanguageSelected() && Number(speakerCountEl.value) === 1) ? 0.75 : 1;
+    const factor = base * quality * diarizacao;
     const mins = Math.max(1, Math.round(1 + minutes * factor));
     estimateLabelEl.textContent = `Cerca de ${mins} minuto${mins === 1 ? '' : 's'} para ${formatTime(span)} de vídeo`;
   }
+
+  // A escolha muda o tempo de processamento de forma perceptivel, entao a
+  // nota existe pra isso ficar explicito antes de gerar: com 1 pessoa o
+  // worker pula a diarizacao inteira (a etapa mais lenta depois da
+  // separacao de trilha); com N>1 ela roda sabendo quantos procurar.
+  function refreshSpeakerNote() {
+    if (!speakerCountEl) return;
+    const n = Number(speakerCountEl.value) || 0;
+    if (n === 1) {
+      speakerNoteEl.textContent = 'Uma voz só na dublagem. Pula a detecção de locutores e fica mais rápido.';
+    } else if (n > 1) {
+      speakerNoteEl.textContent = `Cada uma das ${n} pessoas recebe uma voz diferente.`;
+    } else {
+      speakerNoteEl.textContent = 'O sistema detecta os locutores sozinho e dá uma voz para cada um.';
+    }
+    speakerNoteEl.hidden = false;
+  }
+  speakerCountEl.addEventListener('change', () => { refreshSpeakerNote(); updateEstimate(); });
 
   document.querySelectorAll('input[name="subtitles"], input[name="reframe"]').forEach((el) => {
     el.addEventListener('change', updateEstimate);
@@ -1249,6 +1293,7 @@
       // video_quality vai vazio de proposito: a altura de download sai do
       // modo de reenquadramento no worker (ver reframe.recommended_max_height).
       reframe_mode: getSelected('reframe'),
+      speaker_count: Number(speakerCountEl.value) || 0,
       video_title: videoTitleEl.textContent || '',
       video_duration: videoDuration || 0,
     };
@@ -1442,8 +1487,12 @@
     if (!url) return;
     try {
       const resp = await fetch(url, { method: 'HEAD' });
+      // resp.ok e obrigatorio: o content-length de uma resposta de ERRO
+      // descreve o corpo do erro, nao o arquivo -- era assim que um 405
+      // virava "31 B" no card de download.
+      if (!resp.ok) return;
       const len = resp.headers.get('content-length');
-      if (len) el.textContent = `${label} — ${formatBytes(Number(len))}`;
+      if (len && Number(len) > 0) el.textContent = `${label} — ${formatBytes(Number(len))}`;
     } catch { /* mantem so o rotulo se a checagem de tamanho falhar */ }
   }
 
@@ -1544,6 +1593,7 @@
       include_subtitles: status.include_subtitles !== false,
       video_quality: status.video_quality || '',
       reframe_mode: status.reframe_mode || '',
+      speaker_count: status.speaker_count || 0,
       video_title: status.video_title || '',
       video_duration: status.video_duration || 0,
     };

@@ -15,6 +15,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 All 5 original build phases (see "Build phases" below) are implemented and validated end-to-end with real dubbing (Amazon Polly), including the video-trim feature (§ Frontend) and friendly error handling / logging (§ Quality bar). The original architecture spec (`docs/youclone-arquitetura.md`, in Portuguese) is kept as historical reference; this file is the up-to-date source of truth. See `docs/ARQUITETURA.md` (design/why) and `docs/FLUXO.md` (request trace/how) for the current, detailed documentation. Google Cloud TTS was implemented earlier and then **removed** by explicit operator decision (2026-09) in favor of Polly alone — do not re-add it unless asked.
 
+**Dubbing moved from Amazon Polly to OpenRouter TTS (2026-09), and AWS left the project entirely.** Polly was the only TTS provider for most of the project's life. It was replaced after the operator listened to a real EN→PT short and called the voice robotic. The diagnosis was three compounding causes, all measured rather than guessed: (a) `DUB_VOICE=Thiago` is capped at Polly's `neural` engine — in pt-BR only **Camila** reaches `generative`, per `describe_voices` on the account; (b) the provider asked Polly for `pcm`, which Polly only serves at 8/16 kHz, so every dub was **16 kHz** (mp3/ogg would have given 24 kHz); (c) time-fitting compressed finished audio with `atempo` up to 1.3x, and since PT-BR runs 15–30% longer than EN, nearly every line hit that cap — one measured line needed 1.33x. All three were fixed on Polly first (auto best-engine per voice, 24 kHz, resynthesis instead of `atempo`), and those fixes are what the OpenRouter provider inherited.
+
+The operator then compared voices by ear across the OpenRouter catalogue and kept 10, spread across Gemini, Grok and Kokoro. `Algieba` (Gemini) was the first pick on sound alone, but **the default is `pm_alex` (`hexgrad/kokoro-82m`)** because Kokoro is the only model measured to honour `speed`, and that decides whether the dub lands on time: same clip, max drift from the picture was **0.31s with Kokoro against 1.50s (the cap) with Gemini**. The Kokoro voices are ordered first in `DUB_VOICE_POOL` so multi-speaker jobs get the well-fitted ones before falling back to Gemini/Grok. Polly, `boto3` and every `AWS_*` variable were deleted — the project now has **one** cloud credential, `OPENROUTER_API_KEY`, covering translation and dubbing. Two things were lost in the trade and are worth knowing: Gemini **ignores the `speed` parameter**, so the resynthesis fix does not apply to the default voice (it falls back to `atempo`), and Gemini's voices speak slower than Polly's, so lines overrun their slots more often.
+
+**Voice cloning was investigated and is NOT available here (2026-09).** The obvious follow-up — reuse the original speaker's own voice in PT-BR — looked viable because Voxtral Mini TTS does zero-shot cross-lingual cloning from ~3s of reference, at US$16/M characters (the same price as Polly neural, ~US$0.02/short), and `separate.py` already produces a clean `vocals.wav` that would be the ideal reference. It is blocked at the hosting layer: all three OpenRouter endpoints for Voxtral report **`supports_voice_cloning: false`**, and no model in the catalogue advertises it, even though `/audio/speech` accepts an `input_references` field. Going ahead would mean Mistral's API directly, self-hosting the open weights, or ElevenLabs. **Before building it, note the rights question is a different one from the Content ID risk already accepted:** cloning an identifiable person's voice engages personality rights (in Brazil, CC arts. 11–21 and CF art. 5º, X), not copyright, and YouTube has a separate complaint process for synthetic media simulating a real individual. That is an operator decision that has not been made.
+
 **Translation went through two providers before landing on OpenRouter as the sole one (2026-09).** First **Gemini** (`google-genai`) — worked, but the free tier hit a hard wall: `generativelanguage.googleapis.com/generate_content_free_tier_requests` caps at **20 requests/day per model**, a ceiling of ~20 videos/day regardless of length, no graceful degradation (`429 RESOURCE_EXHAUSTED`). Paying to lift that cap was not the direction chosen; `translate_gemini.py` and `google-genai` were deleted outright. It was replaced by **Amazon Translate** (`translate_aws.py`) — one `translate_text` call per subtitle segment, reusing the AWS credentials already required for Polly, no new secret needed. That also didn't stick: literal/context-blind translation in practice (e.g. "long trunks" → "baús longos" instead of "trombas compridas"), no prompt-based tone control (`TRANSLATE_STYLE` doesn't apply to a plain MT API). `translate_aws.py` was deleted too, once **OpenRouter** (`translate_openrouter.py`) proved out — a generic bridge to OpenRouter's OpenAI-compatible `/chat/completions` endpoint, so any model OpenRouter carries (Gemini included, ironically, just without the free-tier trap) can be swapped in purely via the `OPENROUTER_MODEL` env var (e.g. `deepseek/deepseek-v4-flash`) — no code change to switch models. Keeps the same single-call, numbered-batch prompt style the Gemini provider used, but asks for a JSON **object** (`{"translations": [...]}`) rather than a bare array, since `response_format: json_object` — the most broadly supported way to request structured JSON across different models — generally requires an object at the top level.
 
 `TRANSLATE_PROVIDER=openrouter` is the only supported value today (and the default) — the `Translator` protocol/factory in `engine/steps/translate.py` is still pluggable, but there is currently exactly one implementation. Two lessons carried over from the two removals, both still true of `translate_openrouter.py`: retry-with-backoff on the specific transient/rate-limit codes the API actually returns (HTTP 429/5xx), not a blanket retry-everything (a 4xx like a bad API key won't succeed on a second attempt); and — learned specifically from OpenRouter's own multi-provider routing — a cheap model can return HTTP 200 with the original text echoed back instead of translated, so `translate_batch` also checks the fraction of lines identical to the source and retries (as a *different* failure class) if that fraction is too high.
@@ -57,7 +63,8 @@ A machine for producing **Brazilian-market YouTube Shorts** out of videos that a
 | Input languages | **EN and PT only** (`webapp/languages.py::SOURCE_ENABLED`). A product decision, not a technical limit — Whisper handles all 24 in `LANGUAGES` and the translator takes any of them to PT-BR; opening another one is adding its code to that set. EN = full flow; PT = cut + captions only |
 | Output resolution | **No quality selector** — always automatic, derived from the reframe mode (2160p for `crop`, 1080p for `blur`). The `video_quality` API field survives as a manual override for CLI/debug, but nothing in the UI sets it |
 | Vertical format | Per-video choice: `crop` (center crop, default) / `blur` (blurred background). **Every output is 1080x1920** — a third mode, `none` (keep 16:9), existed and was removed once the operator confirmed he'd never use it, since a 16:9 upload doesn't enter the Shorts feed. Face-tracking crop was deferred, not rejected; a draggable crop-position picker was proposed and dropped |
-| Original audio | `DUB_KEEP_MUSIC=true` by default — original track ducked -18 dB under the dub (keeps music, also keeps the English voice faintly) |
+| Original audio | `DUB_KEEP_MUSIC` gates **source separation**, never ducking. Code default is **`false`** (`engine/config.py`); `worker/.env.example` ships `true`, and the operator's live `worker/.env` currently has `false`. When on, Demucs strips the original voice and only the `no_vocals` bed is mixed under the dub at `DUB_MUSIC_DB` (-6). The raw original track is never mixed in |
+| Speaker count | Asked on Tela 2 (`speaker_count`: 0 = automatic, 1–6). **1 skips diarization entirely** — it is the slowest step after source separation and changes nothing when there is a single voice; N>1 is passed to pyannote as `num_speakers`, removing the part it most often gets wrong |
 | Scope | Single operator, no login/accounts; queue supports multiple concurrent jobs via worker replicas |
 | Environment | Docker Compose on a cloud VM (`webapp` + `worker` + `redis`), or run each service locally without Docker |
 | Language | Python (worker/engine and webapp) |
@@ -67,7 +74,7 @@ A machine for producing **Brazilian-market YouTube Shorts** out of videos that a
 | Frontend | Plain HTML/JS (`webapp/web/index.html`), must be swappable for React without touching the backend |
 | Transcription | faster-whisper (local, free) |
 | Translation | Any LLM via OpenRouter (`OPENROUTER_MODEL`, only provider today); Gemini and Amazon Translate were both tried and removed — see "Current state"; provider must be pluggable |
-| TTS (dubbing) | **Amazon Polly** (only provider implemented; Google Cloud TTS was removed by request); provider architecture stays pluggable for future options (Azure / ElevenLabs) |
+| TTS (dubbing) | **OpenRouter `/audio/speech`** (`tts_openrouter.py`), default `hexgrad/kokoro-82m` / `pm_alex`. Amazon Polly *and* Google Cloud TTS were both implemented and removed — see "Current state". Same `OPENROUTER_API_KEY` as translation; no AWS account in the project any more |
 | Audio/video | ffmpeg (system dependency, only in `worker/`) |
 
 ## Compliance / product rules (implement as default behavior)
@@ -91,16 +98,19 @@ A machine for producing **Brazilian-market YouTube Shorts** out of videos that a
 Python 3.11+, two independent dependency sets:
 
 - `webapp/requirements.txt`: `fastapi`, `uvicorn[standard]`, `redis`, `yt-dlp`, `pydantic`, `python-dotenv`.
-- `worker/requirements.txt`: `redis`, `faster-whisper` (local transcription), `pyannote.audio` + `soundfile` (optional speaker diarization, see "Dubbing"), `boto3` (Polly TTS only — Amazon Translate was removed), `demucs` (source separation, see "Dubbing"), `requests` (OpenRouter translation), `yt-dlp` (download), `pydantic`, `python-dotenv`.
+- `worker/requirements.txt`: `redis`, `faster-whisper` (local transcription), `pyannote.audio` + `soundfile` (optional speaker diarization, see "Dubbing"), `demucs` (source separation, see "Dubbing"), `requests` (OpenRouter — both translation *and* TTS), `yt-dlp` (download), `pydantic`, `python-dotenv`. **No `boto3`** — it left with Polly.
 
 System dependency (not pip, only needed inside `worker/`'s image/environment): **ffmpeg**.
 
-Secrets via environment variables only, never hardcoded: AWS credentials for Polly (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_DEFAULT_REGION`), `OPENROUTER_API_KEY` (translation, the only provider), and `HF_TOKEN` if diarization is enabled — all live only in `worker/.env` (the webapp never needs them). See "Pluggable providers" below for why the AWS credentials are read explicitly instead of via boto3's default chain.
+Secrets via environment variables only, never hardcoded: `OPENROUTER_API_KEY` (translation **and** dubbing) and `HF_TOKEN` if diarization is enabled — both live only in `worker/.env` (the webapp never needs them). **There are no AWS credentials in this project any more.** The explicit-credentials rule that governed them is kept below anyway, because it applies to whatever cloud integration comes next.
 
 ## Directory structure
 
 ```
 docker-compose.yml          # the ONLY file that references both services together
+.github/workflows/deploy.yml # push to main -> SSH deploy to the EC2 box (see "Deployment")
+deploy/setup-ec2.sh         # one-shot bootstrap of a fresh Ubuntu EC2 (docker + git)
+docs/                       # ARQUITETURA.md (design/why), FLUXO.md (request trace/how)
 webapp/                      # SERVICE 1: the site -- fully self-contained
 │   ├── Dockerfile           # build context = this folder
 │   ├── requirements.txt     # light: fastapi, redis, yt-dlp, pydantic
@@ -109,9 +119,12 @@ webapp/                      # SERVICE 1: the site -- fully self-contained
 │   ├── schemas.py           # request/response Pydantic models
 │   ├── queue_client.py      # Redis protocol, PRODUCER half (create_job/get_job/subscribe)
 │   ├── youtube_probe.py     # standalone yt-dlp metadata lookup (NOT a call into worker/engine/)
+│   ├── languages.py         # LANGUAGES + SOURCE_ENABLED/TARGET_ENABLED, served by GET /api/languages
 │   ├── logging_setup.py     # own copy of the logging utility
+│   ├── cookies.txt          # YouTube session cookies -- COMMITTED, see "YouTube access"
 │   └── web/
-│       └── index.html       # frontend: YouTube URL input, optional uncapped trim bar, progress, downloads
+│       ├── index.html       # the whole SPA (5 client-routed screens, one <style>, one <script>)
+│       └── assets/          # self-hosted Inter woff2 subsets + favicon.svg (no CDN font)
 └── worker/                    # SERVICE 2: the motor -- fully self-contained
     ├── Dockerfile            # build context = this folder; installs system ffmpeg
     ├── requirements.txt      # heavy: faster-whisper, pyannote.audio, boto3, requests, yt-dlp
@@ -120,6 +133,7 @@ webapp/                      # SERVICE 1: the site -- fully self-contained
     ├── cli.py                # run the engine standalone from the terminal, no queue
     ├── queue_client.py       # Redis protocol, CONSUMER half (get_job/update_job/publish_event/dequeue)
     ├── logging_setup.py      # own copy of the logging utility
+    ├── cookies.txt           # YouTube session cookies -- COMMITTED, see "YouTube access"
     └── engine/               # THE MOTOR -- pure Python, no web, no Redis
         ├── config.py         # env-based config (loads .env via python-dotenv)
         ├── models.py         # dataclasses (Segment, PipelineResult)
@@ -128,18 +142,19 @@ webapp/                      # SERVICE 1: the site -- fully self-contained
         ├── providers/        # pluggable implementations
         │   ├── translate_openrouter.py  # any LLM via OpenRouter, model set by OPENROUTER_MODEL -- only provider today
         │   ├── translate_base.py
-        │   ├── tts_polly.py  # Amazon Polly -- only TTS provider implemented
-        │   └── tts_base.py   # abstract TTS interface
+        │   ├── tts_openrouter.py # OpenRouter /audio/speech -- only TTS provider
+        │   └── tts_base.py   # abstract TTS interface (synthesize + supports_speed)
         └── steps/
-            ├── download.py   # (1) yt-dlp -- YouTube-only, probe() + download_video() with optional range clip
+            ├── download.py   # (1) yt-dlp -- YouTube-only, probe() + download_video()/download_audio() with optional range clip
             ├── audio.py      # (2) extract audio (ffmpeg)
             ├── transcribe.py # (3) faster-whisper (with timestamps)
             ├── translate.py  # (4) calls the active translation provider
             ├── subtitle.py   # (5) generate .srt/.vtt (the files the operator downloads)
             ├── captions.py   # (5b) .ass -- burned Shorts caption (few words, big)
             ├── separate.py   # (5c) demucs: strips the original voice, keeps the music bed
+            ├── diarize.py    # (5d) optional pyannote: who speaks when -> one Polly voice per speaker
             ├── dub.py        # (6) TTS + temporal fitting
-            ├── reframe.py    # (6b) 9:16 ffmpeg filter (crop/blur/none) -- builds it, does not run it
+            ├── reframe.py    # (6b) 9:16 ffmpeg filter (crop/blur) -- builds it, does not run it
             └── render.py     # (7) single ffmpeg pass: reframe + captions + dubbed audio
 ```
 
@@ -168,10 +183,12 @@ class PipelineResult:
 ### Step interfaces (`steps/`)
 
 - `download.probe(url: str) -> dict` — `{duration, title}` via yt-dlp, without downloading (YouTube-only URL validation). Note: `webapp/youtube_probe.py` is a **separate, standalone reimplementation** of this same idea for the web service — see "Current state" on why they're not shared.
-- `download.download_video(url: str, out_dir: Path, start: float = 0.0, duration: float | None = None) -> Path` — downloads via yt-dlp; when `duration` is given, uses `download_ranges` to fetch only that segment.
+- `download.download_video(url: str, out_dir: Path, start: float = 0.0, duration: float | None = None, max_height: int | None = None) -> Path` — downloads via yt-dlp; when `duration` is given, uses `download_ranges` to fetch only that segment.
+- `download.download_audio(...)` — same options, `bestaudio/best`. It exists because **only `render` needs the video**: transcription, translation and dubbing need audio alone, so `pipeline.run` fetches audio and video on two threads (`ThreadPoolExecutor(max_workers=2)`, both I/O-bound) and the combined wait is the slower of the two instead of their sum.
+- Both `probe` and the two downloaders merge `_cookie_opts()` + `_bot_check_opts()` — see "YouTube access" below.
 - `audio.extract_audio(video_path: Path, work_dir: Path) -> Path` — `.wav` 16kHz mono via ffmpeg.
-- `transcribe.transcribe(audio_path: Path) -> list[Segment]` — faster-whisper, `vad_filter=True`, source language from `config.SOURCE_LANG`.
-- `translate.translate_segments(segments: list[Segment]) -> list[Segment]` — delegates to the active provider; translates **in one batch call** (all lines numbered, response as indexed JSON to preserve order). Fills `seg.translation`.
+- `transcribe.transcribe(audio_path: Path, language: str | None = None) -> list[Segment]` — faster-whisper, `vad_filter=True`. The language comes **per job** (Tela 2 → Redis → `pipeline.run(source_lang=...)`); `None` means Whisper autodetects. There is no `config.SOURCE_LANG` — it was removed when source language became a per-job choice.
+- `translate.translate_segments(segments: list[Segment]) -> list[Segment]` — delegates to the active provider; translates in **chunks of `OPENROUTER_BATCH_SIZE` lines (default 250)**, numbered, response as an indexed JSON object to preserve order. Fills `seg.translation`. It was a single call over the whole video until a ~1400-line job made that call routinely time out — smaller batches answer faster and more reliably, at the cost of more HTTP round-trips and the prompt instructions being re-sent per batch. Segment durations are passed alongside the text (`_word_budget`) so the model is told roughly how many words each line has room for.
 - `subtitle.build_srt(segments, out_path, translated=True) -> Path` — standard `.srt` (index, `HH:MM:SS,mmm --> ...`, text, blank line).
 - `captions.build_ass(segments, out_path, opts) -> Path` — the burned Shorts caption, as `.ass` (the only format ffmpeg/libass accepts with font/outline/position control). Chunks each segment's PT-BR text into `opts["max_words"]` (default 3) pieces and splits the segment's time slot among them **weighted by character count**. Note why it cannot use Whisper word timestamps: Whisper times the **English** audio, but what gets displayed is the PT-BR translation — different words, different count, so those timings do not map. `WrapStyle: 0` is required, not cosmetic — long Portuguese chunks overflow the frame without it (found on the first real render). **`opts["play_res"]` must be the real output resolution**, also not cosmetic: libass scales PlayResX and PlayResY to the frame *independently*, so a mismatch both shrinks the text and visibly distorts its outline (stretched horizontally, squashed vertically) — observed on a real render, back when the `none` mode could emit 1920x1080. Today every output is 1080x1920, so `pipeline.py` always passes that; the parameter stays because the failure it prevents is silent and ugly. Font size, outline and margins are given for a 1920-tall frame and rescaled proportionally to `play_res`.
 - `render.build_final(video, srt, dub_audio, out_path, opts)` takes **`dub_audio: Path | None`** — `None` means "no dub, keep the original audio", the same-language path. The ffmpeg input indices (`[0:v]`, `[1:a]`, the soft-subtitle stream) are computed rather than hardcoded, because dropping the dub input shifts everything after it.
@@ -185,16 +202,19 @@ class PipelineResult:
 ```python
 # translate_base.py
 class Translator(Protocol):
-    def translate_batch(self, texts: list[str]) -> list[str]: ...
+    def translate_batch(self, texts: list[str],
+                        durations: list[float] | None = None) -> list[str]: ...
 
 # tts_base.py
 class TTS(Protocol):
-    def synthesize(self, text: str, voice: str) -> bytes: ...  # WAV/MP3 bytes
+    def synthesize(self, text: str, voice: str, model: str | None = None,
+                   speed: float | None = None) -> bytes: ...   # .wav bytes, 24kHz mono
+    def supports_speed(self, model: str | None = None) -> bool: ...
 ```
 
-Provider selection happens via `config.TRANSLATE_PROVIDER` / `config.TTS_PROVIDER` through a simple factory (in `engine/steps/translate.py` and `engine/steps/dub.py`, respectively). `config.TRANSLATE_PROVIDER` only supports `"openrouter"` today (any LLM behind OpenRouter's OpenAI-compatible API, model chosen via `OPENROUTER_MODEL`) — both Gemini (`google-genai`) and Amazon Translate (`translate_aws.py`) were implemented and then removed (see "Current state"). `config.TTS_PROVIDER` only supports `"polly"` (`tts_polly.PollyTTS`) — Google Cloud TTS was implemented and then deliberately removed too (see "Current state"). Polly returns headerless PCM from the AWS API, wrapped into a proper `.wav` via the stdlib `wave` module (PCM output only supports 8000/16000 Hz sample rates on Polly, unlike its mp3/ogg formats).
+Provider selection happens via `config.TRANSLATE_PROVIDER` / `config.TTS_PROVIDER` through a simple factory (in `engine/steps/translate.py` and `engine/steps/dub.py`, respectively). `config.TRANSLATE_PROVIDER` only supports `"openrouter"` today (any LLM behind OpenRouter's OpenAI-compatible API, model chosen via `OPENROUTER_MODEL`) — both Gemini (`google-genai`) and Amazon Translate (`translate_aws.py`) were implemented and then removed (see "Current state"). `config.TTS_PROVIDER` only supports `"openrouter"` (`tts_openrouter.OpenRouterTTS`) — Google Cloud TTS and Amazon Polly were both implemented and then removed (see "Current state"). Everything is normalised to **24 kHz mono `.wav`** before it reaches `dub.py`, because the dub track is one mixed file and mixing sample rates would break it.
 
-**Security-critical: Polly credentials are read explicitly, never via boto3's default chain.** `PollyTTS.__init__` requires `config.AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`, read only from `worker/.env` (see `engine/config.py`). It deliberately does **not** call bare `boto3.client("polly")` and does **not** support AWS CLI named profiles, because either path falls back to (or can be confused with) `~/.aws/credentials`'s `default` profile, shell env vars, or an IAM instance role — any of which could belong to an unrelated AWS account. This happened once during development (a test silently ran against the operator's employer AWS account because it was the only profile configured on the machine) and was tried again with an explicit `AWS_PROFILE` env var (which also broke: an empty `AWS_PROFILE=` in `.env` still sets the process env var, and boto3 then tries to resolve a profile literally named `""` and raises `ProfileNotFound` even when explicit keys are also passed) — both approaches were rejected by the operator in favor of literal keys only. If a new cloud provider/credential integration is ever added to this project (AWS, GCP, Azure, etc.), follow this same pattern — explicit, project-scoped credentials only, never the SDK's ambient-credential discovery, and prefer literal keys in `.env` over named-profile indirection.
+**Two rules inherited from the removed Polly integration, both still binding.** (1) *Explicit, project-scoped credentials only.* Polly's credentials were read literally from `worker/.env`, never via `boto3`'s default chain, because that chain falls back to `~/.aws/credentials`'s `default` profile, shell env vars, or an IAM role — any of which could belong to an unrelated account. This bit once for real: a test silently ran against the operator's employer AWS account because it was the only profile on the machine. If any cloud integration is added here again, follow that pattern — never the SDK's ambient-credential discovery. (2) *An empty env var is set, not absent.* The `AWS_PROFILE=` attempt failed because an empty value in `.env` still sets the process variable, and boto3 then tried to resolve a profile literally named `""`. The same trap reappeared in `DUB_VOICE_POOL`: `os.environ.get(key, default)` returns `""`, not the default, so `config.py` uses `os.environ.get(key) or default` for every var whose blank value should mean "use the default".
 
 ### Dubbing — the trickiest part (`dub.py`)
 
@@ -203,12 +223,22 @@ Core problem: PT-BR speech tends to run longer than the English original, so the
 1. For each `Segment`, generate TTS audio from `seg.translation`.
 2. Compute the target duration `dur = seg.end - seg.start`.
 3. **Fit to the time slot:**
-   - If TTS clip > `dur`: speed up with ffmpeg `atempo` (cap ~1.3x to avoid a robotic sound; beyond that, allow slight bleed into the next gap).
-   - If TTS clip < `dur`: pad with trailing silence.
+   - If TTS clip > `dur`: ask the **model** for faster speech (`speed`) when it honours the parameter; otherwise fall back to ffmpeg `atempo`. Cap ~1.3x either way; beyond that, allow bleed into the next gap. Resynthesis beats `atempo` because the model re-plans prosody instead of resampling finished audio — `atempo` at 1.3x was a measured cause of the "robotic" complaint.
+   - If TTS clip < `dur` by a wide margin (`_SLOWDOWN_TRIGGER_RATIO` 0.85): **slow it down** instead of leaving a long silence, floored at `_SLOWDOWN_MIN_RATE_PERCENT` (75%).
+   - Otherwise: pad with trailing silence.
 4. **Assemble the full track:** build a silent track the length of the whole video and place each clip at its `seg.start` (via `adelay`/`amix` or concatenation with computed silence gaps). Result: a single `.wav` matching video length, each line in its correct spot.
 5. Return the path to that dubbed track.
 
-Relevant config: `DUB_VOICE` (PT-BR provider voice), `DUB_MAX_SPEEDUP` (e.g. 1.3), `DUB_KEEP_MUSIC` (bool — turns source separation on), `DUB_MUSIC_DB` (bed level, by ear), `DUB_SEPARATION_JOBS` (4; see "Current state" for why more is slower).
+**Multi-voice via diarization (`steps/diarize.py`).** With `DUB_ENABLE_DIARIZATION=true` *and* an `HF_TOKEN`, pyannote (`speaker-diarization-3.1`, a gated HF model — the terms must be accepted on both `speaker-diarization-3.1` and `segmentation-3.0` first) labels who speaks when over the **same `.wav` already extracted for transcription**, and runs on its own thread **in parallel with Whisper**, since both only read that file. `dub._voice_pool()` then gives each detected speaker a different voice: `(DUB_MODEL, DUB_VOICE)` first, then the `model|voice` entries of `DUB_VOICE_POOL`. The pool **spans three different OpenRouter models** (Gemini, Grok, Kokoro) because that is how the voices the operator approved by ear happened to fall — which is why a pool entry carries its model, not just a voice id. Any failure, a missing token, or the flag off returns an empty list and falls back to one voice for everyone — diarization is never allowed to fail a job.
+
+**Per-model quirks live in `tts_openrouter.py`, all measured on this account — none of them are documented together anywhere upstream:**
+- **Output format.** Gemini TTS rejects `response_format: "mp3"` with HTTP 400 and only accepts `"pcm"` (raw 24 kHz 16-bit mono, wrapped into `.wav` locally). Others take mp3. Hence `_PCM_ONLY_MODELS`.
+- **`speed` is advertised API-wide but not honoured by every model.** Same sentence, `speed` absent / 1.3 / 0.8: Gemini returned 5.40s / 5.68s / 5.80s (**ignores it** — the spread is the model's own non-determinism), Grok sped up but would not slow down, and only Kokoro responded correctly in both directions. `_SPEED_CAPABLE_MODELS` is therefore an allowlist, deliberately conservative: asking a model that ignores `speed` would silently leave the line out of time.
+- **Lines that still overrun are pushed, not overlapped.** `_stagger_starts` places each clip at `max(planned start, end of the previous one)`, because `_mix_track` sums everything and a clip that outran its slot otherwise played *on top of* the next line. The accumulated delay dissolves at the first pause in the video (a gap absorbs it and the dub re-syncs with the picture); `DUB_MAX_DRIFT` (1.5s) caps how far a line may be pushed before overlap is preferred, since a visibly out-of-sync dub is worse than two lines touching.
+- **The subtitles follow the dub, not Whisper.** Whisper times the *English* audio, while what plays is the PT-BR dub, refitted and possibly shifted. `synthesize_dub` therefore rewrites `seg.start`/`seg.end` to where each line actually plays. This was found the hard way: with only the audio shifted, **the caption ran ahead of the voice** on a real render. `pipeline.run` also rewrites the `.srt`/`.vtt` *after* dubbing, because they are generated before it and would otherwise ship ahead of the MP4's audio.
+- **`_mix_track` uses `amix=duration=first`**, so the silent base track must be sized by `max(start + clip_duration)` — sizing it by `max(seg.end)` **truncated the last line mid-word**.
+
+Relevant config: `DUB_MODEL`/`DUB_VOICE` (default `google/gemini-3.1-flash-tts-preview` / `Algieba`), `DUB_VOICE_POOL` (extra `model|voice` entries for multi-speaker; may mix models), `DUB_MAX_SPEEDUP` (1.3), `DUB_KEEP_MUSIC` (bool — turns source separation on), `DUB_MUSIC_DB` (bed level, by ear), `DUB_SEPARATION_JOBS` (4; see "Current state" for why more is slower), `HF_TOKEN`/`DUB_ENABLE_DIARIZATION`.
 
 ### Final render (`render.py`)
 
@@ -240,7 +270,8 @@ def run(video_path: Path | None = None,
         max_height: int | None = None,
         reframe_mode: str | None = None,
         should_cancel: Callable[[], bool] | None = None) -> PipelineResult:
-    # order: [download if source_url] → audio → transcribe → translate → subtitle → dub → render(final)
+    # order: [download audio ‖ download video] → transcribe (‖ diarize) → translate
+    #        → subtitle → dub → [separate] → render(final)
     # when source_lang == target_lang: translate and dub are skipped (see
     # _same_language); render still runs, keeping the original audio
     # emit on_progress at each step with increasing pct and a clear PT-BR message
@@ -255,6 +286,7 @@ The orchestrator knows nothing about HTTP, Redis, or jobs — only the callback.
 ## Web service (`webapp/`)
 
 Endpoints (`main.py`):
+- `GET /api/languages`: the `LANGUAGES` list from `webapp/languages.py` with `enabled_as_source`/`enabled_as_target` flags — the single source of truth behind Tela 2's selects, so neither the template nor the JS hardcodes a language list.
 - `GET /api/probe?url=`: reads `{ duration, title }` for a YouTube URL via `youtube_probe.probe` (standalone, not a call into `worker/engine/`), without downloading it — used by the frontend to size the trim bar before submitting.
 - `POST /api/jobs` (JSON body, `JobCreateRequest`: `{url, start?, clip_duration?, source_lang, target_lang, include_subtitles, video_title?, video_duration?, video_quality?, reframe_mode?}`): calls `queue_client.create_job` — writes the job hash to Redis and pushes its id onto `youcreate:queue`. Returns immediately with `{ "id": <job_id> }`; the download and processing happen entirely inside whichever `worker` picks it up. `video_title`/`video_duration` are supplied by the frontend from its earlier `GET /api/probe` call purely so the processing/result screens (Telas 3/4) can render immediately from `GET /api/jobs/{id}` without re-probing.
 - `GET /api/jobs/{id}` (`JobStatus`): reads current state from the Redis hash via `queue_client.get_job` — `status` (`queued|running|done|error|cancelled`), `pct`, `step`, `message`, `error_code`, `created_at`, `source_url`, `source_lang`, `target_lang`, `video_title`, `video_duration`, `include_subtitles`, `reframe_mode`, `clip_start`/`clip_duration`, plus `video_name`/`srt_name` (bare filenames) and `video_url`/`srt_url`/`vtt_url` (signed, time-limited download links — see below). This single endpoint is what lets the frontend fully reconstruct any of Telas 3/4/5 from a cold page load at `/v/{id}` (refresh, or a link opened later), since every field the UI needs is in this one response.
@@ -327,11 +359,35 @@ Loading `/v/{id}` directly (fresh tab, refresh, a link opened later) fully recon
 
 ## Configuration (`.env` per service)
 
-`webapp/.env` (see `webapp/.env.example`): `REDIS_URL`, `STORAGE_DIR`, `OUTPUTS_DIR`. Nothing else — the web service has no secrets.
+`webapp/.env` (see `webapp/.env.example`): `REDIS_URL`, `STORAGE_DIR`, `OUTPUTS_DIR`, `YOUTUBE_COOKIES_FILE`. No API keys — the web service has no cloud secrets (but see "YouTube access" on the cookie file, which *is* a credential).
 
-`worker/.env` (see `worker/.env.example`): `REDIS_URL`, storage paths (`STORAGE_DIR`/`OUTPUTS_DIR`/`WORK_DIR`), AWS credentials (Polly only — Amazon Translate was removed), `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` (translation, the only provider), `SOURCE_LANG`/`TARGET_LANG`, `WHISPER_MODEL`/`WHISPER_DEVICE`/`WHISPER_COMPUTE_TYPE`, `TRANSLATE_PROVIDER`/`TRANSLATE_STYLE`, `TTS_PROVIDER`/`DUB_VOICE`/`POLLY_ENGINE`/`DUB_MAX_SPEEDUP`/`DUB_KEEP_MUSIC`/`DUB_MUSIC_DB`/`DUB_SEPARATION_JOBS`, `HF_TOKEN`/`DUB_ENABLE_DIARIZATION` (optional speaker diarization), `BURN_SUBS`, and the Shorts block: `SHORT_MAX_SECONDS` (180), `REFRAME_MODE` (fallback when a job doesn't specify one), `CAPTION_MAX_WORDS`/`CAPTION_UPPERCASE`/`CAPTION_FONT`/`CAPTION_FONT_SIZE`/`CAPTION_MARGIN_V`. Note `CAPTION_FONT` can only name a font actually installed in the worker image — today that's DejaVu Sans alone; a punchier Shorts face (Montserrat ExtraBold and the like) means adding it to `worker/Dockerfile` too.
+`worker/.env` (see `worker/.env.example`): `REDIS_URL`, storage paths (`STORAGE_DIR`/`OUTPUTS_DIR`/`WORK_DIR`), `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`/`OPENROUTER_BATCH_SIZE` (translation, the only provider), `TARGET_LANG` (there is no `SOURCE_LANG` any more — the source language arrives per job from Tela 2), `YOUTUBE_COOKIES_FILE`, `WHISPER_MODEL`/`WHISPER_DEVICE`/`WHISPER_COMPUTE_TYPE`, `TRANSLATE_PROVIDER`/`TRANSLATE_STYLE`, `TTS_PROVIDER`/`DUB_MODEL`/`DUB_VOICE`/`DUB_VOICE_POOL`/`DUB_MAX_SPEEDUP`/`DUB_KEEP_MUSIC`/`DUB_MUSIC_DB`/`DUB_SEPARATION_JOBS`, `HF_TOKEN`/`DUB_ENABLE_DIARIZATION` (optional speaker diarization), `BURN_SUBS`, and the Shorts block: `SHORT_MAX_SECONDS` (180), `REFRAME_MODE` (fallback when a job doesn't specify one), `CAPTION_MAX_WORDS`/`CAPTION_UPPERCASE`/`CAPTION_FONT`/`CAPTION_FONT_SIZE`/`CAPTION_MARGIN_V`. Note `CAPTION_FONT` can only name a font actually installed in the worker image — today that's DejaVu Sans alone; a punchier Shorts face (Montserrat ExtraBold and the like) means adding it to `worker/Dockerfile` too.
 
 In `docker-compose.yml`, both services get `REDIS_URL=redis://redis:6379/0` injected via `environment:` (overriding whatever's in the `.env` file, which defaults to `redis://localhost:6379/0` for non-Docker local runs).
+
+## YouTube access (cookies + bot check)
+
+YouTube intermittently demands "confirm you're not a robot" before serving metadata or streams, and both services hit it — `webapp/youtube_probe.py` on every `GET /api/probe`, `worker/engine/steps/download.py` on every job. Two layers handle it, and they are **duplicated per service** like everything else across the boundary:
+
+- **`_bot_check_opts()`** (`download.py`) forces `extractor_args={"youtube": {"player_client": ["android", "web"]}}`. Both Dockerfiles carry a comment saying that without this, *even valid cookies* fail with "No video formats found". Keep both clients — `android` is the one that usually works, `web` is the fallback.
+- **`cookies.txt`** — a Netscape-format export of a logged-in YouTube session, path overridable via `YOUTUBE_COOKIES_FILE` (defaults to `cookies.txt` beside `webapp/`/`worker/`). Used only when the file exists, so a machine without one still works for public videos.
+
+⚠️ **The cookie files are committed to git** (`webapp/cookies.txt`, `worker/cookies.txt`), and they contain live Google account session cookies (`SID`, `SAPISID`, `__Secure-1PSID`, `LOGIN_INFO`, …) — credentials that grant access to the operator's Google account, not just to YouTube. `engine/config.py` documents this as an explicit operator decision; **both `.env.example` files contradict it**, claiming the file is "nunca commitado (ver .gitignore)", and `.github/workflows/deploy.yml` notes the GitHub repo is public. If you touch this area: don't paste cookie contents into logs, issues, or any outbound request, and don't "fix" the situation by rotating or deleting them unprompted — but do surface the discrepancy rather than trusting the `.env.example` comment.
+
+## Deployment (GitHub Actions → EC2)
+
+`.github/workflows/deploy.yml` deploys on every push to `main` (plus manual `workflow_dispatch`) — deliberately **not** on `pull_request`, so secrets never run against fork code on a public repo. It SSHes into the EC2 box (`appleboy/ssh-action`) and:
+
+1. `git fetch origin main && git reset --hard origin/main` in `~/youcreate` (cloning first if absent) — **the EC2 instance is a deploy target, not an editing surface; any change made directly on the server is discarded on the next deploy.**
+2. Rewrites `worker/.env` and `webapp/.env` from scratch out of the `WORKER_ENV_FILE`/`WEBAPP_ENV_FILE` GitHub Secrets — so *the way to change production config is to edit those secrets*, never to edit the file on the box.
+3. `docker compose up -d --build && docker image prune -f`.
+4. Health check: `curl -sf http://localhost:8000/`, failing the job if the webapp doesn't answer.
+
+Required repo secrets: `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `WORKER_ENV_FILE`, `WEBAPP_ENV_FILE`.
+
+`deploy/setup-ec2.sh` is the one-shot bootstrap for a fresh Ubuntu instance (Docker Engine + Compose plugin + git, and adds the user to the `docker` group — which only takes effect in a new SSH session). Run it manually once, before the first deploy.
+
+`docker-compose.yml` pins `worker` to `replicas: 1` for the current testing phase; scale with `docker compose up -d --scale worker=N` rather than editing the file. Named volumes: `redis-data`, `outputs` (shared web↔worker), `whisper-cache` (`/root/.cache/huggingface` — holds both the Whisper and the ~80MB Demucs model, which is why neither is re-downloaded on restart).
 
 ## Future seams (leave ready, do NOT implement now)
 
@@ -367,6 +423,8 @@ Each service has its own `logging_setup.py` (`setup_logging(log_file)`; console 
 - Site: `cd webapp && uvicorn main:app --reload` → http://localhost:8000 (needs a local Redis running, and `webapp/.env` with `REDIS_URL` pointing at it)
 - Worker: `cd worker && python worker.py`
 - Engine standalone, no queue: `cd worker && python cli.py <youtube-url> [--no-dub] [--no-subs] [--start N --duration N]`
+
+**There is no test suite and no linter configured** — no `tests/` directory, no pytest/ruff/mypy in either `requirements.txt`, no CI check beyond the deploy workflow's `curl` health probe. Verification today is running a real job end to end (`cd worker && python cli.py <url> --start 0 --duration 60`) and reading `storage/youcreate-worker.log`. Don't invent a test command; if you add tests, add the runner to the relevant `requirements.txt` too.
 
 **Docker Compose** (recommended — this is the actual deploy target):
 - Start everything: `docker compose up -d --build`

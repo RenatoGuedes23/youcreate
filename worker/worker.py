@@ -85,6 +85,7 @@ def _process(job_id: str) -> None:
             target_lang=job.target_lang or None,
             max_height=max_height,
             reframe_mode=reframe_mode,
+            speaker_count=job.speaker_count,
             make_subs=job.include_subtitles,
             make_dub=True,
             should_cancel=lambda: queue_client.is_cancelled(job_id),

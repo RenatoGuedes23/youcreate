@@ -10,6 +10,11 @@ SHORT_MAX_SECONDS = 180.0
 
 REFRAME_MODES = ("", "crop", "blur")
 
+# Teto do seletor "quantas pessoas falam" da Tela 2. Nao e limite tecnico do
+# pyannote -- e que acima disso o pool de vozes comeca a se repetir e a
+# escolha deixa de ajudar.
+MAX_SPEAKERS = 6
+
 
 class JobCreateRequest(BaseModel):
     url: str
@@ -21,6 +26,10 @@ class JobCreateRequest(BaseModel):
     video_title: str = ""
     video_duration: float = 0.0
     video_quality: str = ""  # "" = automatico (derivado do reenquadramento)
+    # 0 = automatico (a diarizacao descobre sozinha). >=1 diz quantas pessoas
+    # falam no video: com 1 a diarizacao nem roda (economiza minutos de CPU),
+    # com N>1 o pyannote recebe o numero e erra menos.
+    speaker_count: int = 0
     reframe_mode: str = ""   # "" = padrao do worker; ou crop|blur|none
 
     @field_validator("clip_duration")
@@ -30,6 +39,15 @@ class JobCreateRequest(BaseModel):
             raise ValueError(
                 f"Um Short vai ate {int(SHORT_MAX_SECONDS)} segundos "
                 f"({int(SHORT_MAX_SECONDS // 60)} minutos)."
+            )
+        return value
+
+    @field_validator("speaker_count")
+    @classmethod
+    def _sane_speaker_count(cls, value: int) -> int:
+        if value < 0 or value > MAX_SPEAKERS:
+            raise ValueError(
+                f"Numero de pessoas deve ser 0 (automatico) ou ate {MAX_SPEAKERS}."
             )
         return value
 
@@ -73,6 +91,7 @@ class JobStatus(BaseModel):
     include_subtitles: bool = True
     video_quality: str = ""
     reframe_mode: str = ""
+    speaker_count: int = 0
     # O corte precisa voltar pro cliente: sem ele, o "tentar de novo" da
     # tela de erro reenviaria o job sem recorte e processaria o video
     # inteiro -- furando o teto de Shorts, que so e checado quando

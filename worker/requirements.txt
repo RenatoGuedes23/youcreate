@@ -10,7 +10,6 @@ pyannote.audio
 # torch/torchaudio ja vem do pyannote.audio.
 demucs
 soundfile
-boto3
 requests
 yt-dlp
 yt-dlp-ejs

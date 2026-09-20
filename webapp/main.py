@@ -106,6 +106,7 @@ def create_job(payload: JobCreateRequest) -> JobCreated:
         video_duration=payload.video_duration,
         video_quality=payload.video_quality,
         reframe_mode=payload.reframe_mode,
+        speaker_count=payload.speaker_count,
     )
     logger.info("Job %s criado e enfileirado para %s", job_id, payload.url)
     return JobCreated(id=job_id)
@@ -132,6 +133,7 @@ def get_job(job_id: str) -> JobStatus:
         include_subtitles=job.include_subtitles,
         video_quality=job.video_quality,
         reframe_mode=job.reframe_mode,
+        speaker_count=job.speaker_count,
         clip_start=job.url_clip_start,
         clip_duration=job.url_clip_duration,
         video_name=job.result_video,
@@ -192,7 +194,13 @@ def job_events(job_id: str) -> StreamingResponse:
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-@app.get("/api/download/{filename}")
+# HEAD junto com GET de proposito: a tela de resultado faz um HEAD em cada
+# link assinado so pra ler o content-length e mostrar o tamanho do arquivo no
+# card de download. Registrada so como GET, a rota respondia 405 ao HEAD --
+# e o frontend exibia o content-length do proprio JSON de erro (31 bytes)
+# como se fosse o tamanho do video. O FileResponse do Starlette ja omite o
+# corpo quando o metodo e HEAD, entao nao ha custo de leitura do arquivo.
+@app.api_route("/api/download/{filename}", methods=["GET", "HEAD"])
 def download(filename: str, exp: int, sig: str) -> FileResponse:
     safe_name = Path(filename).name
     if time.time() > exp:

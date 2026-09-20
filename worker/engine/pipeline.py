@@ -53,7 +53,7 @@ class PipelineCancelled(RuntimeError):
     """Levantada quando should_cancel() diz sim entre duas etapas.
 
     So cancela ENTRE etapas (nunca no meio de uma chamada de ffmpeg/Whisper/
-    tradutor/Polly em andamento) -- e uma escolha deliberada de simplicidade:
+    tradutor/TTS em andamento) -- e uma escolha deliberada de simplicidade:
     interromper um subprocesso de ffmpeg ou uma chamada de API a meio caminho
     exigiria infraestrutura de cancelamento bem mais complexa.
     """
@@ -76,6 +76,7 @@ def run(
     target_lang: str | None = None,
     max_height: int | None = None,
     reframe_mode: str | None = None,
+    speaker_count: int = 0,
     should_cancel: Callable[[], bool] | None = None,
 ) -> PipelineResult:
     if video_path is None and source_url is None:
@@ -86,7 +87,7 @@ def run(
 
     # Video ja no idioma de destino: nao ha o que traduzir nem o que dublar.
     # O trabalho vira so transcrever (pra ter a legenda), reenquadrar e
-    # legendar -- sai sem custo de OpenRouter nem de Polly. Dublar por cima
+    # legendar -- sai sem nenhuma chamada ao OpenRouter. Dublar por cima
     # de uma narracao que ja esta no idioma certo so pioraria o video, e
     # mandar o texto pro tradutor dispararia a trava anti-eco dele (uma
     # traducao correta de PT pra PT devolve o proprio texto).
@@ -135,7 +136,12 @@ def run(
 
         _check_cancelled()
         on_progress("transcribe", "Transcrevendo", 20, "Transcrevendo audio original...")
-        if make_dub and not skip_translation:
+        # speaker_count == 1: o operador informou na Tela 2 que so ha uma
+        # pessoa falando, entao nao ha nada pra diarizar -- pular a etapa
+        # economiza varios minutos de CPU (o pyannote e a etapa mais lenta
+        # do pipeline depois da separacao de fontes) sem mudar o resultado,
+        # ja que com um locutor so todas as falas usariam DUB_VOICE mesmo.
+        if make_dub and not skip_translation and speaker_count != 1:
             # Diarizacao (quem fala quando) so importa pra dublagem
             # multi-voz -- roda em paralelo com a transcricao, ja que as
             # duas processam o mesmo audio_path de forma independente uma
@@ -146,14 +152,20 @@ def run(
                 transcribe_future = executor.submit(
                     transcribe.transcribe, audio_path, language=source_lang or None,
                 )
-                diarize_future = executor.submit(diarize.diarize, audio_path)
+                diarize_future = executor.submit(
+                    diarize.diarize, audio_path, speaker_count,
+                )
                 segments = transcribe_future.result()
                 turns = diarize_future.result()
 
-            speaker_count = diarize.assign_speakers(segments, turns)
-            if speaker_count > 1:
-                logger.info("Diarizacao detectou %d locutores distintos.", speaker_count)
+            detectados = diarize.assign_speakers(segments, turns)
+            if detectados > 1:
+                logger.info("Diarizacao detectou %d locutores distintos.", detectados)
         else:
+            if speaker_count == 1:
+                logger.info(
+                    "Operador informou 1 locutor: diarizacao pulada (voz unica)."
+                )
             segments = transcribe.transcribe(audio_path, language=source_lang or None)
         result.segments = segments
 
@@ -194,6 +206,16 @@ def run(
                 _check_cancelled()
                 on_progress("dub", "Dublando", 72, "Gerando dublagem PT-BR...")
                 result.dub_audio_path = dub.synthesize_dub(segments, work_dir)
+
+                # synthesize_dub reescreve seg.start/seg.end com o tempo real
+                # da fala dublada (ver o comentario la). O .ass queimado e
+                # construido depois daqui e ja pega o tempo novo, mas o .srt
+                # e o .vtt foram gerados ANTES da dublagem -- sem reescrever,
+                # o arquivo que o operador baixa fica adiantado em relacao a
+                # voz do MP4.
+                if make_subs and result.srt_path:
+                    subtitle.build_srt(segments, result.srt_path, translated=True)
+                    subtitle.build_vtt(segments, result.vtt_path, translated=True)
 
                 if config.DUB_KEEP_MUSIC:
                     # Etapa propria no progresso porque e lenta (~45s por
