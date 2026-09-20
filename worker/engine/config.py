@@ -71,3 +71,24 @@ HF_TOKEN = os.environ.get("HF_TOKEN", "")
 DUB_ENABLE_DIARIZATION = os.environ.get("DUB_ENABLE_DIARIZATION", "true").lower() == "true"
 
 BURN_SUBS = os.environ.get("BURN_SUBS", "true").lower() == "true"
+
+# --- Formato Shorts (vertical) ---
+# Limite do YouTube Shorts: vertical/quadrado com ate 3 minutos (era 60s ate
+# outubro de 2024). Acima disso o video vira um upload comum, fora do feed de
+# Shorts. Atencao a uma regra separada: Short com MAIS de 60s que use musica
+# nao-livre de direitos leva claim de Content ID e e bloqueado -- o que
+# importa aqui porque DUB_KEEP_MUSIC preserva a trilha do video original.
+SHORT_MAX_SECONDS = int(os.environ.get("SHORT_MAX_SECONDS", "180"))
+
+# Reenquadramento padrao quando o job nao especifica (ver engine/steps/reframe.py):
+# crop (corte central) | blur (fundo desfocado) | none (mantem 16:9).
+REFRAME_MODE = os.environ.get("REFRAME_MODE", "crop")
+
+# Legenda queimada estilo Shorts (engine/steps/captions.py). Poucas palavras
+# por vez, fonte grande. DejaVu Sans e a unica familia instalada na imagem do
+# worker; trocar exige instalar a fonte no Dockerfile tambem.
+CAPTION_MAX_WORDS = int(os.environ.get("CAPTION_MAX_WORDS", "3"))
+CAPTION_UPPERCASE = os.environ.get("CAPTION_UPPERCASE", "false").lower() == "true"
+CAPTION_FONT = os.environ.get("CAPTION_FONT", "DejaVu Sans")
+CAPTION_FONT_SIZE = int(os.environ.get("CAPTION_FONT_SIZE", "92"))
+CAPTION_MARGIN_V = int(os.environ.get("CAPTION_MARGIN_V", "600"))

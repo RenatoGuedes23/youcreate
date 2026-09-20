@@ -105,6 +105,7 @@ def create_job(payload: JobCreateRequest) -> JobCreated:
         video_title=payload.video_title,
         video_duration=payload.video_duration,
         video_quality=payload.video_quality,
+        reframe_mode=payload.reframe_mode,
     )
     logger.info("Job %s criado e enfileirado para %s", job_id, payload.url)
     return JobCreated(id=job_id)
@@ -130,6 +131,9 @@ def get_job(job_id: str) -> JobStatus:
         target_lang=job.target_lang,
         include_subtitles=job.include_subtitles,
         video_quality=job.video_quality,
+        reframe_mode=job.reframe_mode,
+        clip_start=job.url_clip_start,
+        clip_duration=job.url_clip_duration,
         video_name=job.result_video,
         srt_name=job.result_srt,
         video_url=_download_url(job.result_video),

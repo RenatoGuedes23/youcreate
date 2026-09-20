@@ -50,7 +50,12 @@ class JobRecord:
     include_subtitles: bool = True
     video_title: str = ""
     video_duration: float = 0.0
-    video_quality: str = ""  # "" = melhor disponivel (sem limite); ou "480"/"720"/"1080" (altura em pixels)
+    # "" = automatico: a altura vem do modo de reenquadramento (o corte
+    # central descarta as laterais, entao precisa de fonte maior que o
+    # desfocado). Ver engine/steps/reframe.py::recommended_max_height.
+    # Ou um valor explicito em pixels: "480"/"720"/"1080"/"2160".
+    video_quality: str = ""
+    reframe_mode: str = ""   # "" = padrao do worker; ou crop|blur|none
     status: str = "queued"   # queued|running|done|error|cancelled
     pct: int = 0
     step: str = ""
@@ -78,6 +83,7 @@ def get_job(job_id: str) -> JobRecord | None:
         video_title=data.get("video_title", ""),
         video_duration=float(data.get("video_duration") or 0.0),
         video_quality=data.get("video_quality", ""),
+        reframe_mode=data.get("reframe_mode", ""),
         status=data.get("status", "queued"),
         pct=int(data.get("pct") or 0),
         step=data.get("step", ""),

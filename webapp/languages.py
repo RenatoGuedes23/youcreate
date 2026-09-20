@@ -39,9 +39,21 @@ LANGUAGES = [
 # na Tela 2 como opcao de "Traduzir para", mas desabilitados ("em breve").
 TARGET_ENABLED = {"pt"}
 
+# Idiomas de ENTRADA oferecidos hoje. Decisao de produto, nao limitacao
+# tecnica: o Whisper transcreve todos os da lista acima e o tradutor leva
+# qualquer um deles pro PT-BR. O operador optou por trabalhar so com estes
+# dois por enquanto (ingles = fluxo completo com traducao e dublagem;
+# portugues = so corte e legenda, ver engine/pipeline.py::_same_language).
+# Abrir outro idioma depois e acrescentar o codigo aqui, nada mais.
+SOURCE_ENABLED = {"pt", "en"}
+
 
 def languages_payload() -> list[dict]:
     return [
-        {**lang, "enabled_as_target": lang["code"] in TARGET_ENABLED}
+        {
+            **lang,
+            "enabled_as_target": lang["code"] in TARGET_ENABLED,
+            "enabled_as_source": lang["code"] in SOURCE_ENABLED,
+        }
         for lang in LANGUAGES
     ]

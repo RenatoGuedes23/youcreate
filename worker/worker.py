@@ -15,6 +15,7 @@ from engine import config
 from engine.ffmpeg_utils import is_ffmpeg_available
 from engine.pipeline import PipelineCancelled, PipelineError
 from engine.pipeline import run as run_pipeline
+from engine.steps import reframe
 from logging_setup import setup_logging
 
 import queue_client
@@ -57,6 +58,20 @@ def _process(job_id: str) -> None:
         queue_client.update_job(job_id, step=step_id, pct=pct, message=message)
         queue_client.publish_event(job_id, {"step": step_id, "label": label, "pct": pct, "message": message})
 
+    # Qualidade "Automatico" (video_quality vazio): a altura de download sai
+    # do modo de reenquadramento, porque o corte central joga fora as laterais
+    # do 16:9 e precisa de uma fonte maior pra ainda entregar 1080x1920 sem
+    # upscale. Um valor explicito vindo do site sempre tem prioridade.
+    # Job antigo no Redis pode carregar um modo que nao existe mais (o
+    # "none" foi removido) -- cai no padrao em vez de falhar no render.
+    reframe_mode = job.reframe_mode
+    if reframe_mode not in reframe.VALID_MODES:
+        reframe_mode = config.REFRAME_MODE
+    if job.video_quality:
+        max_height = int(job.video_quality)
+    else:
+        max_height = reframe.recommended_max_height(reframe_mode)
+
     try:
         result = run_pipeline(
             on_progress=on_progress,
@@ -65,7 +80,11 @@ def _process(job_id: str) -> None:
             url_clip_start=job.url_clip_start,
             url_clip_duration=job.url_clip_duration,
             source_lang=job.source_lang or None,
-            max_height=int(job.video_quality) if job.video_quality else None,
+            # Quando bate com source_lang, o motor pula traducao e dublagem
+            # (ver engine/pipeline.py::_same_language).
+            target_lang=job.target_lang or None,
+            max_height=max_height,
+            reframe_mode=reframe_mode,
             make_subs=job.include_subtitles,
             make_dub=True,
             should_cancel=lambda: queue_client.is_cancelled(job_id),
