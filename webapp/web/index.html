@@ -286,11 +286,6 @@
     background: var(--accent-bg); border: 1px solid var(--accent);
     color: var(--accent-text); font-size: 13.5px; line-height: 1.5;
   }
-  .trim-warning {
-    margin-top: 14px; padding: 12px 14px; border-radius: 10px;
-    background: rgba(240, 180, 41, 0.10); border: 1px solid rgba(240, 180, 41, 0.35);
-    color: var(--text-2); font-size: 13.5px; line-height: 1.5;
-  }
   .quality-opt {
     border: 1px solid var(--border-field); padding: 16px 18px; cursor: pointer;
   }
@@ -306,19 +301,13 @@
     position: relative; height: 32px;
     background: var(--surface); border: 1px solid var(--border); touch-action: none;
   }
+  /* min-width mantem a janela agarravel mesmo quando 60s representam uma
+     fracao minuscula da barra (num video de uma hora, ~1,6%). */
   .trim-window {
     position: absolute; top: 0; height: 100%; min-width: 28px;
     background: var(--accent); cursor: grab;
   }
   .trim-window:active { cursor: grabbing; }
-  .trim-grip {
-    position: absolute; top: 0; height: 100%; width: 16px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: ew-resize;
-  }
-  .trim-grip.left { left: 0; }
-  .trim-grip.right { right: 0; }
-  .trim-grip .bar { width: 4px; height: 16px; border-radius: 2px; background: rgba(0,0,0,0.35); }
   .trim-times {
     display: flex; justify-content: space-between;
     font-size: 11.5px; color: var(--text-3); margin-top: 8px;
@@ -557,14 +546,10 @@
 
       <fieldset class="lang-section" id="trim-section" hidden>
         <legend>Corte</legend>
-        <p class="hint">Escolha o trecho a localizar arrastando as bordas (opcional) — ou deixe a faixa inteira selecionada para processar o vídeo todo.</p>
+        <p class="hint">O short tem 60 segundos. Arraste a janela — ou clique na barra — para escolher qual trecho do vídeo entra.</p>
         <div class="trim-track" id="trim-track">
-          <div class="trim-window" id="trim-window">
-            <div class="trim-grip left" id="grip-left"><span class="bar"></span></div>
-            <div class="trim-grip right" id="grip-right"><span class="bar"></span></div>
-          </div>
+          <div class="trim-window" id="trim-window"></div>
         </div>
-        <p class="trim-warning" id="trim-warning" hidden></p>
         <div class="trim-times">
           <span id="trim-start-label">00:00</span>
           <span class="range" id="trim-range-label">00:00 – 00:00</span>
@@ -656,15 +641,15 @@
 </main>
 
 <script>
-  const MIN_CLIP_SECONDS = 1;
-  // Teto do YouTube Shorts: vertical/quadrado ate 3 minutos. Acima disso o
-  // upload sai do feed de Shorts. Validado tambem no backend (schemas.py).
-  const MAX_CLIP_SECONDS = 180;
-  // Fronteira separada e igualmente dura: Short com MAIS de 60s que use
-  // musica nao-livre de direitos leva claim de Content ID e e bloqueado.
-  // Como o video mantem a trilha do original (DUB_KEEP_MUSIC), cruzar essa
-  // linha e um risco real -- dai o aviso, e nao so uma marca decorativa.
-  const MUSIC_SAFE_SECONDS = 60;
+  // Duracao FIXA do short. A janela de corte nao e redimensionavel: o
+  // operador so escolhe ONDE ela cai na linha do tempo. Escolher tambem o
+  // tamanho era ajuste demais a cada video, e 60s e o limite que importa
+  // -- acima disso o YouTube bloqueia Short que use musica com direitos,
+  // e este produto preserva a trilha do original (DUB_KEEP_MUSIC). Como a
+  // janela nunca passa disso, esse risco deixou de existir.
+  // O backend ainda aceita ate 180s (schemas.py::SHORT_MAX_SECONDS), que
+  // e o limite real do YouTube -- este 60 e a regra do fluxo, nao da API.
+  const CLIP_SECONDS = 60;
   const CJK_CODES = new Set(['ja', 'zh', 'ko']);
   const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be']);
 
@@ -774,12 +759,9 @@
   const trimSection = document.getElementById('trim-section');
   const trimTrack = document.getElementById('trim-track');
   const trimWindow = document.getElementById('trim-window');
-  const gripLeft = document.getElementById('grip-left');
-  const gripRight = document.getElementById('grip-right');
   const trimStartLabel = document.getElementById('trim-start-label');
   const trimRangeLabel = document.getElementById('trim-range-label');
   const trimTotalLabel = document.getElementById('trim-total-label');
-  const trimWarningEl = document.getElementById('trim-warning');
 
   const configureForm = document.getElementById('configure-form');
   const backBtn = document.getElementById('back-btn');
@@ -1130,7 +1112,7 @@
 
       if (videoDuration > 0) {
         trimSection.hidden = false;
-        setClipRange(0, Math.min(videoDuration, MAX_CLIP_SECONDS));
+        setClipStart(0);
       } else {
         trimSection.hidden = true;
         needsTrim = false;
@@ -1167,28 +1149,15 @@
   }
 
   // ---------- Corte (trim) ----------
-  function setClipRange(start, end) {
+  // Recebe so o inicio: a janela tem largura fixa (CLIP_SECONDS), ou o
+  // video inteiro quando ele for mais curto que isso.
+  function setClipStart(start) {
     if (!videoDuration) return;
-    start = Math.max(0, start);
-    end = Math.min(videoDuration, end);
-    if (end - start < MIN_CLIP_SECONDS) {
-      const mid = (start + end) / 2;
-      end = Math.min(videoDuration, mid + MIN_CLIP_SECONDS / 2);
-      start = Math.max(0, end - MIN_CLIP_SECONDS);
-    }
-    // Ao bater no teto, trava a alca que esta sendo arrastada -- e nao a
-    // outra, que "fugiria" sozinha pela tela. Qual delas mexeu se descobre
-    // comparando com o valor anterior (clipStart ainda nao foi reatribuido).
-    if (end - start > MAX_CLIP_SECONDS) {
-      if (start !== clipStart) {
-        start = end - MAX_CLIP_SECONDS;   // arrastando a borda esquerda
-      } else {
-        end = start + MAX_CLIP_SECONDS;   // arrastando a direita
-      }
-    }
+    const span = Math.min(CLIP_SECONDS, videoDuration);
+    start = Math.max(0, Math.min(start, videoDuration - span));
     clipStart = start;
-    clipEnd = end;
-    needsTrim = !(clipStart <= 0.05 && clipEnd >= videoDuration - 0.05);
+    clipEnd = start + span;
+    needsTrim = span < videoDuration - 0.05;
 
     const leftPct = (clipStart / videoDuration) * 100;
     const widthPct = ((clipEnd - clipStart) / videoDuration) * 100;
@@ -1198,48 +1167,24 @@
     trimStartLabel.textContent = formatTime(clipStart);
     trimTotalLabel.textContent = formatTime(videoDuration);
     trimRangeLabel.textContent = `${formatTime(clipStart)} – ${formatTime(clipEnd)} (${formatTime(clipEnd - clipStart)})`;
-
-    const span = clipEnd - clipStart;
-    if (span > MUSIC_SAFE_SECONDS) {
-      trimWarningEl.hidden = false;
-      trimWarningEl.textContent =
-        `Acima de ${MUSIC_SAFE_SECONDS}s o YouTube bloqueia Shorts que usem música `
-        + `com direitos autorais — e este vídeo mantém a trilha do original. `
-        + `Abaixo de ${MUSIC_SAFE_SECONDS}s não há esse risco.`;
-    } else {
-      trimWarningEl.hidden = true;
-    }
     updateEstimate();
   }
 
   let dragMode = null;
   let dragStartX = 0;
   let dragStartClipStart = 0;
-  let dragStartClipEnd = 0;
 
   trimWindow.addEventListener('pointerdown', (e) => {
-    if (gripLeft.contains(e.target)) dragMode = 'left';
-    else if (gripRight.contains(e.target)) dragMode = 'right';
-    else dragMode = 'move';
+    dragMode = 'move';
     dragStartX = e.clientX;
     dragStartClipStart = clipStart;
-    dragStartClipEnd = clipEnd;
     trimWindow.setPointerCapture(e.pointerId);
   });
   trimWindow.addEventListener('pointermove', (e) => {
     if (!dragMode) return;
     const rect = trimTrack.getBoundingClientRect();
     const deltaSec = ((e.clientX - dragStartX) / rect.width) * videoDuration;
-    if (dragMode === 'left') {
-      setClipRange(dragStartClipStart + deltaSec, dragStartClipEnd);
-    } else if (dragMode === 'right') {
-      setClipRange(dragStartClipStart, dragStartClipEnd + deltaSec);
-    } else {
-      const dur = dragStartClipEnd - dragStartClipStart;
-      let newStart = dragStartClipStart + deltaSec;
-      newStart = Math.max(0, Math.min(newStart, videoDuration - dur));
-      setClipRange(newStart, newStart + dur);
-    }
+    setClipStart(dragStartClipStart + deltaSec);
   });
   trimWindow.addEventListener('pointerup', () => { dragMode = null; });
   trimWindow.addEventListener('pointercancel', () => { dragMode = null; });
@@ -1248,10 +1193,7 @@
     if (trimWindow.contains(e.target)) return;
     const rect = trimTrack.getBoundingClientRect();
     const sec = ((e.clientX - rect.left) / rect.width) * videoDuration;
-    const dur = clipEnd - clipStart;
-    let newStart = sec - dur / 2;
-    newStart = Math.max(0, Math.min(newStart, videoDuration - dur));
-    setClipRange(newStart, newStart + dur);
+    setClipStart(sec - (clipEnd - clipStart) / 2);
   });
 
   // ---------- Gerar vídeo ----------
